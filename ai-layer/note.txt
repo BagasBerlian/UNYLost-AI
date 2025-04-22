@@ -1,0 +1,33 @@
+mkdir ai-layer && cd ai-layer
+python -m venv venv
+source venv/Scripts/activate
+pip install fastapi uvicorn torch torchvision scikit-learn numpy pillow firebase-admin requests
+pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+Buat app/main.py
+Buat Endpoint Dasar: app/routers/image_matcher.py
+python generate_embeddings.py
+uvicorn app.main:app --reload
+
+
+Menyiapkan firebase:
+1. Kunjungi: https://console.firebase.google.com
+2. Klik “Add Project” / “Buat Proyek”
+3. Beri nama proyek (misalnya: UNYLost-AI)
+4. Pilih “Enable Google Analytics” → boleh dinonaktifkan
+5. Selesai → Firebase akan membuatkan project-mu.
+
+Aktifkan Firestore -> menyimpan metadata / embedding :
+1. Masuk ke Firebase Console
+2. Pilih proyekmu → klik menu “Build > Firestore Database”
+3. Klik “Create database”
+4. Pilih Start in test mode (untuk pengembangan), klik Next
+5. Pilih lokasi (misal asia-southeast1), lalu Enable
+
+Buat Service Account Key -> Service Account ini digunakan agar backend Python bisa akses Firebase (Firestore) :
+1. Project settings
+2. Service Account
+3. generate new private Key
+4. ubah nama file "serviceAccountKey.json", download
+5. letakkan file di firebase-key/serviceAccountKey.json
+
+Manage Google Drive API : https://console.cloud.google.com/apis/library/drive.googleapis.com?project=unylost-ai

@@ -1,0 +1,58 @@
+# Common
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# AI Layer - Python
+ai-layer/venv/
+ai-layer/__pycache__/
+ai-layer/**/__pycache__/
+ai-layer/**/*.py[cod]
+ai-layer/**/*$py.class
+ai-layer/firebase_key/
+ai-layer/temp_images/*.jpg
+ai-layer/temp_images/*.png
+ai-layer/temp_images/*.jpeg
+ai-layer/embeddings/*.npy
+ai-layer/embeddings/*.pkl
+
+# Backend - Node.js
+backend/node_modules/
+backend/.env
+backend/config/firebase_key.json
+backend/logs/
+
+# Frontend - React Native/Expo
+frontend/node_modules/
+frontend/.expo/
+frontend/.expo-shared/
+frontend/build/
+frontend/web-build/
+frontend/dist/
+frontend/.env
+frontend/*.jks
+frontend/*.p8
+frontend/*.p12
+frontend/*.key
+frontend/*.mobileprovision
+frontend/*.orig.*
+
+# Android/iOS build files
+frontend/android/app/build/
+frontend/android/app/debug.keystore
+frontend/android/app/release.keystore
+frontend/android/.gradle/
+frontend/ios/build/
+frontend/ios/Pods/
+frontend/ios/*.xcworkspace
+
+# Package lock - optionally gitignore these for cleaner history
+# backend/package-lock.json
+# frontend/package-lock.json
+# frontend/yarn.lock
