@@ -11,7 +11,7 @@ router = APIRouter(prefix="/image-matcher", tags=["Image Matching"])
 async def match_image(file: UploadFile = File(...)):
     image = Image.open(BytesIO(await file.read())).convert("RGB")
 
-    embedding = extract_features(image)
+    embedding = extract_features(image) 
 
     matches = find_similar_items(embedding)
 
