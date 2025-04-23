@@ -1,50 +1,43 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.routers import image_matcher, text_matcher, hybrid_matcher
+import os
 
-# Import routers dengan penanganan error
-try:
-    from app.routers import image_matcher
-    has_image_matcher = True
-except ImportError:
-    has_image_matcher = False
-    print("⚠️ Peringatan: Modul image_matcher tidak ditemukan")
+os.makedirs("app/models", exist_ok=True)
+os.makedirs("app/embeddings", exist_ok=True)
+os.makedirs("temp_images", exist_ok=True)
 
-# Inisialisasi FastAPI
 app = FastAPI(
-    title="UNYLost AI Layer",
-    description="API untuk layanan pencocokan barang hilang dan temuan",
+    title="UNYLost AI API",
+    description="API untuk mencari barang hilang dan temuan dengan AI",
     version="1.0.0"
 )
 
 # Setup CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Ubah ini di production
+    allow_origins=["*"],  # Dalam produksi, ganti dengan domain yang diizinkan
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers jika ada
-if has_image_matcher:
-    app.include_router(image_matcher.router)
-else:
-    print("⚠️ Router image_matcher tidak ditambahkan karena modul tidak ditemukan")
+app.include_router(image_matcher.router)
+app.include_router(text_matcher.router)
+app.include_router(hybrid_matcher.router)
 
 @app.get("/")
 async def root():
     return {
-        "message": "UNYLost AI Layer API berhasil berjalan",
+        "app": "UNYLost AI API",
         "version": "1.0.0",
+        "status": "running",
         "endpoints": {
-            "docs": "/docs",
-            "health": "/health"
+            "image_matching": "/image-matcher/match",
+            "found_item_add": "/image-matcher/add-found-item",
+            "text_matching": "/text-matcher/match",
+            "text_search": "/text-matcher/search",
+            "hybrid_matching": "/hybrid-matcher/match",
+            "hybrid_search": "/hybrid-matcher/search"
         }
-    }
-
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "timestamp": "2025-04-22T16:35:00"
     }

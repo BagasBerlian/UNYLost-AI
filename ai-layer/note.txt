@@ -6,7 +6,7 @@ pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-
 Buat app/main.py
 Buat Endpoint Dasar: app/routers/image_matcher.py
 python generate_embeddings.py
-uvicorn app.main:app --reload
+
 
 
 Menyiapkan firebase:
@@ -31,3 +31,15 @@ Buat Service Account Key -> Service Account ini digunakan agar backend Python bi
 5. letakkan file di firebase-key/serviceAccountKey.json
 
 Manage Google Drive API : https://console.cloud.google.com/apis/library/drive.googleapis.com?project=unylost-ai
+
+# Setup Firebase dan data awal
+python setup_firebase.py --with-samples
+
+# Inisialisasi model-model ML
+python init_models.py
+
+# Jalankan aplikasi (mode development)
+python run.py || uvicorn app.main:app --reload
+
+# Atau jalankan aplikasi (mode production)
+python run.py --prod --host 0.0.0.0 --port 8080

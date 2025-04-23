@@ -1,28 +1,67 @@
-from fastapi import APIRouter, Body
-from app.services.text_encoder import extract_text_features, find_similar_texts, store_text_embedding_to_firebase
-from typing import Dict, Optional
+from fastapi import APIRouter, HTTPException, Form, Query
+from app.services.text_encoder import find_similar_items_by_text
+from typing import Optional
 
 router = APIRouter(prefix="/text-matcher", tags=["Text Matching"])
 
-@router.post("/")
-async def match_text(data: Dict[str, str] = Body(...)):
-    description = data.get("description", "")
-    if not description:
-        return {"error": "Description is required", "matches": []}
-    
-    matches = find_similar_texts(description)
-    
-    return {"matches": matches}
+@router.post("/match")
+async def match_text(
+    query: str = Form(...),
+    threshold: float = Form(0.3),
+    max_results: int = Form(10)
+):
+    try:
+        if not query:
+            raise HTTPException(status_code=400, detail="Query text is required")
+            
+        if threshold < 0 or threshold > 1:
+            raise HTTPException(status_code=400, detail="Threshold must be between 0 and 1")
+            
+        if max_results < 1:
+            raise HTTPException(status_code=400, detail="Max results must be at least 1")
+            
+        matches = find_similar_items_by_text(query, threshold=threshold)
+        
+        matches = matches[:max_results]
+        
+        return {
+            "query": query,
+            "matches": matches,
+            "total_matches": len(matches)
+        }
+        
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Error matching text: {str(e)}")
 
-@router.post("/store")
-async def store_text(data: Dict[str, str] = Body(...)):
-    item_id = data.get("id")
-    item_name = data.get("item_name", "")
-    description = data.get("description", "")
-    
-    if not item_id or not description:
-        return {"error": "ID and description are required"}
-    
-    embedding = store_text_embedding_to_firebase(item_id, item_name, description)
-    
-    return {"message": "Text embedding saved successfully", "embedding_size": len(embedding)}
+@router.get("/search")
+async def search_text(
+    q: str = Query(..., description="Query text to search for"),
+    threshold: float = Query(0.3, description="Minimum similarity threshold"),
+    max_results: int = Query(10, description="Maximum number of results to return")
+):
+    try:
+        if not q:
+            raise HTTPException(status_code=400, detail="Query text is required")
+            
+        if threshold < 0 or threshold > 1:
+            raise HTTPException(status_code=400, detail="Threshold must be between 0 and 1")
+            
+        if max_results < 1:
+            raise HTTPException(status_code=400, detail="Max results must be at least 1")
+            
+        matches = find_similar_items_by_text(q, threshold=threshold)
+        
+        matches = matches[:max_results]
+        
+        return {
+            "query": q,
+            "matches": matches,
+            "total_matches": len(matches)
+        }
+        
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Error searching text: {str(e)}")

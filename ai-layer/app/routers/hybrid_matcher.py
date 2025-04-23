@@ -1,72 +1,153 @@
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from PIL import Image
-from app.services.upload_to_drive import upload_to_drive
-from app.services.image_encoder import extract_features, find_similar_items
-from app.services.text_encoder import find_similar_texts
+from app.services.hybrid_matcher import find_items_hybrid
 from io import BytesIO
-import os
+from typing import Optional
 import json
+import requests
 
 router = APIRouter(prefix="/hybrid-matcher", tags=["Hybrid Matching"])
 
-@router.post("/")
-async def match_hybrid(
-    file: UploadFile = File(None),
-    description: str = Form(""),
-    item_name: str = Form(""),
-    category: str = Form("")
+# Endpoint untuk pencocokan hybrid (gambar + teks)
+@router.post("/match")
+async def hybrid_match(
+    file: Optional[UploadFile] = File(None),
+    query: str = Form(None),
+    image_threshold: float = Form(0.7),  
+    text_threshold: float = Form(0.3),
+    image_weight: float = Form(0.4), 
+    text_weight: float = Form(0.6),
+    max_results: int = Form(10)
 ):
-    image_matches = []
-    text_matches = []
-    
-    if file:
-        image = Image.open(BytesIO(await file.read())).convert("RGB")
-        image_embedding = extract_features(image)
-        image_matches = find_similar_items(image_embedding)
-    
-    if description:
-        text_matches = find_similar_texts(description)
-    
-    if not image_matches and file:
-        file_path = f"temp_images/{file.filename}"
-        os.makedirs("temp_images", exist_ok=True)
-        
-        with open(file_path, "wb") as f:
-            f.seek(0)
-            f.write(await file.read())
+    try:
+        if not file and not query:
+            raise HTTPException(
+                status_code=400, 
+                detail="At least one of file or query text must be provided"
+            )
             
-        image_url = upload_to_drive(file_path, file.filename)
-        print(f"✅ Gambar berhasil diupload ke: {image_url}")
-    
-    combined_matches = []
-    
-    if image_matches and text_matches:
-        image_match_ids = [match["id"] for match in image_matches]
-        
-        for text_match in text_matches:
-            if text_match["id"] in image_match_ids:
-                image_score = next((match["score"] for match in image_matches if match["id"] == text_match["id"]), 0)
-                combined_score = (text_match["score"] + image_score) / 2
-                combined_matches.append({
-                    **text_match,
-                    "image_score": image_score,
-                    "text_score": text_match["score"],
-                    "score": combined_score,
-                    "match_type": "hybrid"
-                })
-    
-    for match in image_matches:
-        if not any(item["id"] == match["id"] for item in combined_matches):
-            combined_matches.append({**match, "match_type": "image_only"})
+        if image_threshold < 0 or image_threshold > 1:
+            raise HTTPException(status_code=400, detail="Image threshold must be between 0 and 1")
             
-    for match in text_matches:
-        if not any(item["id"] == match["id"] for item in combined_matches):
-            combined_matches.append({**match, "match_type": "text_only"})
-    
-    combined_matches.sort(key=lambda x: x["score"], reverse=True)
-    
-    return {
-        "matches": combined_matches,
-        "image_matches_count": len(image_matches),
-        "text_matches_count": len(text_matches)
-    }
+        if text_threshold < 0 or text_threshold > 1:
+            raise HTTPException(status_code=400, detail="Text threshold must be between 0 and 1")
+            
+        if image_weight < 0 or text_weight < 0:
+            raise HTTPException(status_code=400, detail="Weights must be positive values")
+            
+        if max_results < 1:
+            raise HTTPException(status_code=400, detail="Max results must be at least 1")
+        
+        image = None
+        if file:
+            file_content = await file.read()
+            image = Image.open(BytesIO(file_content)).convert("RGB")
+        
+        matches = find_items_hybrid(
+            image=image,
+            text=query,
+            image_threshold=image_threshold,
+            text_threshold=text_threshold,
+            image_weight=image_weight,
+            text_weight=text_weight,
+            max_results=max_results
+        )
+        
+        for match in matches:
+            if "embedding" in match:
+                del match["embedding"]
+            if "text_embedding" in match:
+                del match["text_embedding"]
+        
+        return {
+            "image_provided": file is not None,
+            "text_provided": query is not None,
+            "matches": matches,
+            "total_matches": len(matches),
+            "parameters": {
+                "image_threshold": image_threshold,
+                "text_threshold": text_threshold,
+                "image_weight": image_weight,
+                "text_weight": text_weight
+            }
+        }
+        
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Error in hybrid matching: {str(e)}")
+
+# Endpoint GET untuk pencarian hybrid
+@router.get("/search")
+async def hybrid_search(
+    q: Optional[str] = Query(None, description="Text query"),
+    image_url: Optional[str] = Query(None, description="URL of image to match"),
+    image_threshold: float = Query(0.7, description="Minimum image similarity threshold"),
+    text_threshold: float = Query(0.3, description="Minimum text similarity threshold"),
+    image_weight: float = Query(0.6, description="Weight for image similarity score"),
+    text_weight: float = Query(0.4, description="Weight for text similarity score"),
+    max_results: int = Query(10, description="Maximum number of results")
+):
+    try:
+        if not q and not image_url:
+            raise HTTPException(
+                status_code=400, 
+                detail="At least one of text query or image URL must be provided"
+            )
+            
+        if image_threshold < 0 or image_threshold > 1:
+            raise HTTPException(status_code=400, detail="Image threshold must be between 0 and 1")
+            
+        if text_threshold < 0 or text_threshold > 1:
+            raise HTTPException(status_code=400, detail="Text threshold must be between 0 and 1")
+            
+        if image_weight < 0 or text_weight < 0:
+            raise HTTPException(status_code=400, detail="Weights must be positive values")
+            
+        if max_results < 1:
+            raise HTTPException(status_code=400, detail="Max results must be at least 1")
+        
+        image = None
+        if image_url:
+            try:
+                response = requests.get(image_url, timeout=10)
+                image = Image.open(BytesIO(response.content)).convert("RGB")
+            except Exception as img_error:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Error fetching or processing image from URL: {str(img_error)}"
+                )
+        
+        matches = find_items_hybrid(
+            image=image,
+            text=q,
+            image_threshold=image_threshold,
+            text_threshold=text_threshold,
+            image_weight=image_weight,
+            text_weight=text_weight,
+            max_results=max_results
+        )
+        
+        for match in matches:
+            if "embedding" in match:
+                del match["embedding"]
+            if "text_embedding" in match:
+                del match["text_embedding"]
+        
+        return {
+            "image_provided": image_url is not None,
+            "text_provided": q is not None,
+            "matches": matches,
+            "total_matches": len(matches),
+            "parameters": {
+                "image_threshold": image_threshold,
+                "text_threshold": text_threshold,
+                "image_weight": image_weight,
+                "text_weight": text_weight
+            }
+        }
+        
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Error in hybrid searching: {str(e)}")

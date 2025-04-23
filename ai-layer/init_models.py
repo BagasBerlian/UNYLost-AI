@@ -1,120 +1,120 @@
+import os
+import pickle
 import torch
 import torchvision.models as models
-import pickle
-import os
 from sklearn.feature_extraction.text import TfidfVectorizer
-import nltk
-from datetime import datetime
+import numpy as np
+from PIL import Image
+import logging
 
-print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Memulai inisialisasi model...")
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# 1. Persiapan direktori
-os.makedirs("app/models", exist_ok=True)
-os.makedirs("app/embeddings", exist_ok=True)
+# Pastikan direktori yang dibutuhkan ada
+def ensure_directories_exist():
+    os.makedirs("app/models", exist_ok=True)
+    os.makedirs("app/embeddings", exist_ok=True)
+    os.makedirs("temp_images", exist_ok=True)
+    logger.info("Direktori yang dibutuhkan telah dibuat/diverifikasi")
 
-# 2. Mengunduh resource NLTK untuk pemrosesan bahasa alami
-print("Mengunduh resource NLTK...")
-nltk.download('stopwords')
-nltk.download('punkt')
+# Inisialisasi model ResNet50
+def init_resnet():
+    logger.info("Menginisialisasi model ResNet50...")
+    try:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        logger.info(f"Menggunakan device: {device}")
+        
+        # Load model ResNet50
+        resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        resnet.eval()
+        # Hapus layer terakhir
+        resnet = torch.nn.Sequential(*list(resnet.children())[:-1])
+        resnet.to(device)
+        
+        # Simpan model ke file untuk penggunaan offline (opsional)
+        torch.save(resnet.state_dict(), "app/models/resnet50_feature_extractor.pth")
+        logger.info("Model ResNet50 berhasil diinisialisasi dan disimpan")
+        
+        # Generate contoh embedding untuk verifikasi
+        # Buat gambar kosong untuk testing
+        dummy_image = Image.new('RGB', (224, 224), color = 'white')
+        from app.services.image_encoder import extract_features
+        dummy_embedding = extract_features(dummy_image)
+        logger.info(f"Verifikasi extrak fitur: shape={dummy_embedding.shape}")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error inisialisasi ResNet50: {str(e)}")
+        return False
 
-# Stopwords custom
-stopwords_id = [
-    "yang", "dan", "di", "dengan", "ini", "itu", "atau", "pada", "juga",
-    "dari", "akan", "ke", "karena", "oleh", "saat", "tersebut", "sangat",
-    "untuk", "dalam", "tidak", "ada", "telah", "seperti", "sebagai",
-    "bahwa", "dapat", "para", "harus", "bisa", "demikian", "sebuah",
-    "adalah", "merupakan", "hingga"
-]
+# Inisialisasi TF-IDF Vectorizer
+def init_tfidf_vectorizer():
+    logger.info("Menginisialisasi TF-IDF Vectorizer...")
+    try:
+        # Stopwords Bahasa Indonesia
+        stopwords_id = [
+            'yang', 'dan', 'di', 'ke', 'pada', 'untuk', 'dengan', 'adalah', 'ini', 'itu',
+            'atau', 'juga', 'dari', 'akan', 'tidak', 'telah', 'dalam', 'secara', 'sehingga',
+            'oleh', 'saya', 'kamu', 'dia', 'mereka', 'kami', 'kita', 'ada', 'bisa', 'dapat',
+            'sudah', 'belum', 'jika', 'kalau', 'namun', 'tetapi', 'maka', 'sebagai', 'karena'
+        ]
+        
+        # Buat vectorizer dengan parameter dasar
+        vectorizer = TfidfVectorizer(
+            lowercase=True,
+            ngram_range=(1, 2),
+            max_features=10000,
+            min_df=1,
+            max_df=0.9,
+            stop_words=stopwords_id
+        )
+        
+        # Latih dengan beberapa contoh dokumen untuk inisialisasi
+        sample_docs = [
+            "dompet hitam berisi kartu mahasiswa",
+            "laptop asus warna silver dengan stiker",
+            "kunci motor honda dengan gantungan",
+            "buku catatan berwarna merah",
+            "kacamata hitam dengan case",
+            "jam tangan digital warna hitam",
+            "flashdisk sandisk warna biru",
+            "kartu tanda mahasiswa atas nama",
+            "handphone samsung warna hitam"
+        ]
+        
+        vectorizer.fit(sample_docs)
+        
+        # Simpan vectorizer
+        with open("app/models/tfidf_vectorizer.pkl", "wb") as f:
+            pickle.dump(vectorizer, f)
+        
+        # Verifikasi dengan ekstrak fitur
+        sample_features = vectorizer.transform(["dompet hitam berisi KTM"])
+        logger.info(f"Verifikasi TF-IDF: shape={sample_features.shape}")
+        logger.info("TF-IDF Vectorizer berhasil diinisialisasi dan disimpan")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error inisialisasi TF-IDF Vectorizer: {str(e)}")
+        return False
 
-# 3. Inisialisasi model gambar (ResNet50)
-print("Menginisialisasi model ResNet...")
-try:
-    # Menggunakan pretrained=True untuk mendapatkan model yang sudah dilatih pada ImageNet
-    model = models.resnet50(pretrained=True)
-    # Hilangkan layer terakhir untuk mendapatkan feature extractor
-    resnet_feature_extractor = torch.nn.Sequential(*list(model.children())[:-1])
-     # Set model ke mode evaluasi
-    resnet_feature_extractor.eval() 
-
-    # Simpan model ke direktori model
-    torch.save(resnet_feature_extractor.state_dict(), "app/models/resnet50_feature_extractor.pth")
-    print("✅ Model ResNet50 berhasil disimpan")
-except Exception as e:
-    print(f"❌ Gagal menginisialisasi ResNet: {str(e)}")
-    raise
-
-# 4. Inisialisasi TF-IDF Vectorizer untuk pemrosesan teks
-print("Menginisialisasi TF-IDF Vectorizer...")
-try:
-    # Membuat vectorizer dengan parameter yang optimal untuk pencocokan teks
-    vectorizer = TfidfVectorizer(
-        lowercase=True,  # Konversi semua teks menjadi huruf kecil
-        stop_words=stopwords_id,  # Gunakan stopwords bahasa Indonesia
-        ngram_range=(1, 2),  # Gunakan unigram dan bigram untuk hasil lebih baik
-        max_df=0.85,  # Abaikan kata yang muncul di >85% dokumen (terlalu umum)
-        min_df=2,     # Abaikan kata yang muncul kurang dari 2 dokumen
-        max_features=5000  # Batasi jumlah fitur untuk efisiensi
-    )
-
-    # Buat contoh data untuk fitting vectorizer
-    # Data ini penting untuk "mengajari" vectorizer tentang domain spesifik (barang hilang)
-    sample_texts = [
-        "kartu tanda mahasiswa hilang di perpustakaan",
-        "menemukan dompet berisi uang dan kartu di kantin",
-        "laptop tertinggal di ruang kelas fakultas teknik",
-        "kunci motor hilang di parkiran fakultas ekonomi",
-        "menemukan payung di halte bus",
-        "kehilangan buku catatan kuliah di gazebo kampus",
-        "menemukan flashdisk di laboratorium komputer",
-        "jaket tertinggal di ruang seminar",
-        "helm motor hilang di parkiran basement",
-        "kehilangan handphone samsung di toilet perpustakaan"
-    ]
-
-    # Fit vectorizer dengan contoh data
-    vectorizer.fit(sample_texts)
-
-    # Simpan vectorizer ke file pickle
-    with open("app/models/tfidf_vectorizer.pkl", "wb") as f:
-        pickle.dump(vectorizer, f)
-    print("✅ TF-IDF Vectorizer berhasil disimpan")
+# Fungsi utama untuk inisialisasi semua model
+def init_all_models():
+    ensure_directories_exist()
+    resnet_success = init_resnet()
+    tfidf_success = init_tfidf_vectorizer()
     
-    # Simpan juga contoh embedding sebagai referensi
-    sample_embeddings = []
-    for i, text in enumerate(sample_texts):
-        vector = vectorizer.transform([text]).toarray()[0]
-        sample_embeddings.append({
-            "id": f"sample_{i+1}",
-            "text": text,
-            "embedding": vector
-        })
-    
-    with open("app/embeddings/sample_text_embeddings.pkl", "wb") as f:
-        pickle.dump(sample_embeddings, f)
-    print("✅ Contoh embedding teks berhasil disimpan")
-    
-except Exception as e:
-    print(f"❌ Gagal menginisialisasi TF-IDF Vectorizer: {str(e)}")
-    raise
+    if resnet_success and tfidf_success:
+        logger.info("Semua model berhasil diinisialisasi")
+        return True
+    else:
+        logger.error("Ada error dalam inisialisasi model")
+        return False
 
-# 5. Validasi instalasi dengan mencoba menggunakan model yang telah disimpan
-print("Memvalidasi model yang diinisialisasi...")
-try:
-    # Coba muat model ResNet
-    loaded_model = torch.nn.Sequential(*list(models.resnet50().children())[:-1])
-    loaded_model.load_state_dict(torch.load("app/models/resnet50_feature_extractor.pth"))
-    
-    # Coba muat vectorizer
-    with open("app/models/tfidf_vectorizer.pkl", "rb") as f:
-        loaded_vectorizer = pickle.load(f)
-    
-    test_text = "pengujian vectorizer tfidf"
-    vector = loaded_vectorizer.transform([test_text])
-    
-    print("✅ Validasi model berhasil!")
-except Exception as e:
-    print(f"❌ Validasi model gagal: {str(e)}")
-    raise
-
-print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ✅ Seluruh proses inisialisasi model selesai!")
-print("Anda dapat menjalankan aplikasi dengan perintah: python run.py")
+if __name__ == "__main__":
+    # Jalankan inisialisasi
+    init_all_models()
