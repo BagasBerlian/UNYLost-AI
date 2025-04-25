@@ -10,6 +10,7 @@ Thumbs.db
 *.swo
 
 # AI Layer - Python
+ai-layer/app/models/**
 ai-layer/venv/
 ai-layer/__pycache__/
 ai-layer/**/__pycache__/
