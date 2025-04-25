@@ -1,0 +1,56 @@
+Testing Add Found Item
+    Klik endpoint /image-matcher/add-found-item
+    Klik tombol "Try it out"
+    Isi parameter yang diperlukan:
+    item_name (misalnya: "Dompet Hitam")
+    description (misalnya: "Dompet kulit warna hitam dengan logo UNY")
+    location (misalnya: "Perpustakaan Pusat UNY")
+    category (misalnya: "Dompet/Tas")
+
+Testing Image Matching
+    Klik endpoint /image-matcher/match
+    Klik tombol "Try it out"
+    Upload file gambar:
+    Pilih gambar serupa dengan yang Anda upload sebelumnya (idealnya gambar yang sama dari sudut yang berbeda)
+    Biarkan threshold kosong untuk menggunakan nilai default
+    Klik tombol "Execute"
+    Perhatikan respons:
+    Lihat apakah barang yang Anda tambahkan sebelumnya muncul di daftar matches
+    Perhatikan score kecocokan
+
+Testing Text Matching
+    Klik endpoint /text-matcher/search
+    Klik tombol "Try it out"
+    Isi parameter:
+    q (misalnya: "dompet hitam")
+    Biarkan parameter lain dengan nilai default
+    Klik tombol "Execute"
+    Perhatikan respons:
+    Lihat apakah barang Anda muncul di hasil pencarian
+    Periksa score kecocokan
+
+Testing Hybrid Matching
+    Klik endpoint /hybrid-matcher/match
+    Klik tombol "Try it out"
+    Upload file gambar seperti Testing Image Matching
+    Isi query teks (misalnya: "dompet hitam")
+    Biarkan parameter lain dengan nilai default
+    Klik tombol "Execute"
+    Perhatikan respons:
+    Periksa apakah barang Anda muncul dengan skor hybrid
+    Lihat bagaimana skor dibandingkan dengan pencocokan gambar atau teks saja
+
+Verifikasi Detail Item
+    Catat item_id dari respons Testing Add Found Item
+    Klik endpoint /image-matcher/items/{item_id}
+    Klik tombol "Try it out"
+    Masukkan item_id yang Anda catat
+    Klik tombol "Execute"
+    Verifikasi detail yang ditampilkan cocok dengan yang Anda masukkan
+
+Urutan Debugging yang disarankan:
+    Pertama, cek /debug-items untuk melihat item yang sudah ada
+    Kedua, jalankan /debug-retrain untuk melatih ulang vectorizer
+    Ketiga, jalankan /debug-regenerate-embeddings untuk memperbarui semua text embedding
+    Keempat, gunakan /simple-search?q=botol untuk mencari menggunakan pendekatan sederhana
+    Terakhir, coba lagi /text-matcher/search?q=botol&threshold=0.1 untuk melihat apakah masalah sudah teratasi

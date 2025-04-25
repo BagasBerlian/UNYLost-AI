@@ -6,7 +6,6 @@ import uvicorn
 import importlib.util
 import subprocess
 
-# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -14,17 +13,14 @@ logging.basicConfig(
 logger = logging.getLogger("run")
 
 def verify_environment():
-    """Verifikasi environment dan dependensi"""
     logger.info("Memeriksa environment dan dependensi...")
     
-    # Cek direktori yang dibutuhkan
     required_dirs = ["app", "firebase_key", "temp_images"]
     for directory in required_dirs:
         if not os.path.exists(directory):
             logger.error(f"Direktori {directory} tidak ditemukan, membuat direktori...")
             os.makedirs(directory, exist_ok=True)
     
-    # Cek file konfigurasi Firebase
     if not os.path.exists("firebase_key/serviceAccountKey.json"):
         logger.error("Service account key tidak ditemukan di firebase_key/serviceAccountKey.json")
         logger.error("Harap download dari Firebase Console > Project Settings > Service Accounts")
