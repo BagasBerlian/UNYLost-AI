@@ -8,13 +8,12 @@ import requests
 
 router = APIRouter(prefix="/hybrid-matcher", tags=["Hybrid Matching"])
 
-# Endpoint untuk pencocokan hybrid (gambar + teks)
 @router.post("/match")
 async def hybrid_match(
     file: Optional[UploadFile] = File(None),
     query: str = Form(None),
     image_threshold: float = Form(0.7),  
-    text_threshold: float = Form(0.3),
+    text_threshold: float = Form(0.2),
     image_weight: float = Form(0.4), 
     text_weight: float = Form(0.6),
     max_results: int = Form(10)
@@ -77,7 +76,6 @@ async def hybrid_match(
             raise e
         raise HTTPException(status_code=500, detail=f"Error in hybrid matching: {str(e)}")
 
-# Endpoint GET untuk pencarian hybrid
 @router.get("/search")
 async def hybrid_search(
     q: Optional[str] = Query(None, description="Text query"),

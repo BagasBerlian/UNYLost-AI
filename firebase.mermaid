@@ -1,0 +1,230 @@
+classDiagram
+  %% Firebase Firestore Classes
+  class FoundItemCollection {
+    -id: string
+    -item_name: string
+    -category: string
+    -description: string
+    -location_found: string
+    -date_found: timestamp
+    -reporter_id: string
+    -reporter_contact: string
+    -status: string
+    -image_url: string
+    -embedding: array
+    -text_embedding: array
+    -is_augmented: boolean
+    -original_id: string
+    -augmentation_type: string
+    -updated_at: timestamp
+    -view_count: number
+    -match_count: number
+    +addItem(itemData, imageUrl, embeddings): string
+    +getById(id): FoundItem
+    +updateItem(id, itemData): boolean
+    +updateStatus(id, status): boolean
+    +incrementViewCount(id): boolean
+    +incrementMatchCount(id): boolean
+    +getByCategory(category): Array~FoundItem~
+    +getAll(filters): Array~FoundItem~
+    +getBySimilarEmbedding(embedding, threshold): Array~FoundItem~
+    +getBySimilarTextEmbedding(textEmbedding, threshold): Array~FoundItem~
+    +delete(id): boolean
+  }
+
+  class LostItemCollection {
+    -id: string
+    -item_name: string
+    -category: string
+    -description: string
+    -last_seen_location: string
+    -date_lost: timestamp
+    -owner_id: string
+    -owner_contact: string
+    -status: string
+    -reward: string
+    -image_url: string
+    -embedding: array
+    -text_embedding: array
+    -updated_at: timestamp
+    +addItem(itemData, imageUrl, embeddings): string
+    +getById(id): LostItem
+    +updateItem(id, itemData): boolean
+    +updateStatus(id, status): boolean
+    +getByOwner(ownerId): Array~LostItem~
+    +getByCategory(category): Array~LostItem~
+    +getAll(filters): Array~LostItem~
+    +getBySimilarEmbedding(embedding, threshold): Array~LostItem~
+    +getBySimilarTextEmbedding(textEmbedding, threshold): Array~LostItem~
+    +delete(id): boolean
+  }
+
+  class MatchCollection {
+    -id: string
+    -lost_item_id: string
+    -found_item_id: string
+    -match_score: number
+    -image_score: number
+    -text_score: number
+    -match_type: string
+    -status: string
+    -created_at: timestamp
+    -updated_at: timestamp
+    +addMatch(matchData): string
+    +getById(id): Match
+    +getByLostItem(lostItemId): Array~Match~
+    +getByFoundItem(foundItemId): Array~Match~
+    +updateStatus(id, status): boolean
+    +delete(id): boolean
+  }
+
+  class CategoryCollection {
+    -id: string
+    -name: string
+    -description: string
+    -icon: string
+    -priority: number
+    -item_count: number
+    -created_at: timestamp
+    +addCategory(categoryData): string
+    +getById(id): Category
+    +getAll(): Array~Category~
+    +updateCategory(id, categoryData): boolean
+    +incrementItemCount(id): boolean
+    +decrementItemCount(id): boolean
+    +delete(id): boolean
+  }
+
+  class MatchFeedbackCollection {
+    -id: string
+    -match_id: string
+    -is_correct: boolean
+    -user_id: string
+    -timestamp: timestamp
+    -comments: string
+    +addFeedback(feedbackData): string
+    +getById(id): MatchFeedback
+    +getByMatch(matchId): Array~MatchFeedback~
+    +getByUser(userId): Array~MatchFeedback~
+    +getAll(filters): Array~MatchFeedback~
+    +getAccuracyStats(): Object
+  }
+
+  class ImageMatcher {
+    -resnet: ResNet50Model
+    -transform: ImageTransform
+    -device: string
+    +extractFeatures(image): array
+    +extractFeaturesFromUrl(url): array
+    +findSimilarItems(embedding, threshold): Array~FoundItem~
+    +compareEmbeddings(embedding1, embedding2): number
+    +augmentImage(image): Array~Image~
+    +saveEmbeddingWithAugmentation(itemData, image): string
+    +loadModel(): boolean
+    +preprocessImage(image): Image
+  }
+
+  class TextMatcher {
+    -vectorizer: TfidfVectorizer
+    -stopwords: Array~string~
+    +preprocessText(text): string
+    +extractTextFeatures(text): array
+    +findSimilarItemsByText(queryText, threshold): Array~FoundItem~
+    +compareTextEmbeddings(embedding1, embedding2): number
+    +fitVectorizer(descriptions): boolean
+    +loadVectorizer(): boolean
+    +saveTextEmbedding(itemId, description): boolean
+  }
+
+  class HybridMatcher {
+    -imageMatcher: ImageMatcher
+    -textMatcher: TextMatcher
+    +findItemsHybrid(image, text, thresholds, weights): Array~Item~
+    +combineScores(imageScore, textScore, weights): number
+    +rankMatches(matches): Array~Item~
+    +optimizeParameters(feedbackData): Object
+  }
+
+  class FirebaseStorageService {
+    -bucket: StorageBucket
+    +uploadImage(filePath, fileName): string
+    +downloadImage(url): Image
+    +deleteImage(url): boolean
+    +getPublicUrl(fileId): string
+    +generateThumbnail(image): Image
+  }
+
+  class FirestoreService {
+    -db: Firestore
+    +connectToFirestore(): boolean
+    +addDocument(collection, data): string
+    +getDocument(collection, id): Object
+    +updateDocument(collection, id, data): boolean
+    +deleteDocument(collection, id): boolean
+    +queryDocuments(collection, query): Array~Object~
+    +batchUpdate(operations): boolean
+    +runTransaction(updateFunction): boolean
+  }
+
+  class FeedbackLearner {
+    -matchFeedback: MatchFeedbackCollection
+    +recordMatchFeedback(matchId, isCorrect, userId): boolean
+    +analyzeFeedback(): Object
+    +adjustThresholds(): Object
+    +getFeedbackStats(): Object
+    +calculateAccuracy(): number
+    +identifyProblemPatterns(): Array~Object~
+    +generateRecommendations(): Array~string~
+  }
+
+  class ImageMatcherAPI {
+    -imageMatcher: ImageMatcher
+    -firestoreService: FirestoreService
+    -storageService: FirebaseStorageService
+    +matchImage(file): Response
+    +addFoundItem(itemData, file): Response
+    +getMatchingStats(): Response
+    +handleImageUpload(file): string
+  }
+
+  class TextMatcherAPI {
+    -textMatcher: TextMatcher
+    -firestoreService: FirestoreService
+    +matchText(query, threshold, maxResults): Response
+    +searchText(query, threshold, maxResults): Response
+    +analyzeQueryPerformance(query): Response
+  }
+
+  class HybridMatcherAPI {
+    -hybridMatcher: HybridMatcher
+    -firestoreService: FirestoreService
+    -storageService: FirebaseStorageService
+    +hybridMatch(file, query, thresholds, weights): Response
+    +hybridSearch(query, imageUrl, thresholds, weights): Response
+    +getOptimalParameters(): Response
+  }
+
+  %% Relationships
+  FoundItemCollection -- FirestoreService : uses
+  LostItemCollection -- FirestoreService : uses
+  MatchCollection -- FirestoreService : uses
+  CategoryCollection -- FirestoreService : uses
+  MatchFeedbackCollection -- FirestoreService : uses
+  
+  ImageMatcher -- FoundItemCollection : uses
+  ImageMatcher -- LostItemCollection : uses
+  ImageMatcher -- FirebaseStorageService : uses
+  
+  TextMatcher -- FoundItemCollection : uses
+  TextMatcher -- LostItemCollection : uses
+  
+  HybridMatcher -- ImageMatcher : uses
+  HybridMatcher -- TextMatcher : uses
+  HybridMatcher -- MatchCollection : uses
+  
+  FeedbackLearner -- MatchFeedbackCollection : uses
+  FeedbackLearner -- HybridMatcher : optimizes
+  
+  ImageMatcherAPI -- ImageMatcher : uses
+  TextMatcherAPI -- TextMatcher : uses
+  HybridMatcherAPI -- HybridMatcher : uses

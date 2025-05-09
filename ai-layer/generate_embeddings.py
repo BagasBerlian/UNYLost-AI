@@ -17,5 +17,4 @@ data = [
 with open("app/embeddings/Icon_unylost.pkl", "wb") as f:
     pickle.dump(data, f)
 
-# print(embedding)
 print("✅ Embedding berhasil dibuat dan disimpan.")

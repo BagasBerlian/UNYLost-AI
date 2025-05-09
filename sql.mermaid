@@ -1,0 +1,221 @@
+classDiagram
+  %% MySQL Database Classes
+  class User {
+    -id: int
+    -full_name: string
+    -email: string
+    -password: string
+    -phone_number: string
+    -is_verified: boolean
+    -verification_token: string
+    -reset_password_token: string
+    -reset_password_expires: datetime
+    -last_login: datetime
+    -created_at: datetime
+    -updated_at: datetime
+    +register(userData): User
+    +verifyEmail(token): boolean
+    +login(email, password): Token
+    +forgotPassword(email): string
+    +resetPassword(token, newPassword): boolean
+    +updateProfile(userData): boolean
+    +changePassword(oldPassword, newPassword): boolean
+    +getUserById(id): User
+    +getUserByEmail(email): User
+  }
+
+  class FoundItem {
+    -id: int
+    -user_id: int
+    -firestore_id: string
+    -item_name: string
+    -category_id: int
+    -description: text
+    -location: string
+    -found_date: date
+    -image_url: string
+    -status: enum
+    -created_at: datetime
+    -updated_at: datetime
+    +create(itemData): FoundItem
+    +getById(id): FoundItem
+    +getByFirestoreId(id): FoundItem
+    +updateStatus(id, status): boolean
+    +updateItem(id, itemData): boolean
+    +deleteItem(id): boolean
+    +getByUser(userId): Array~FoundItem~
+    +getByCategory(categoryId): Array~FoundItem~
+    +getAll(filters, pagination): Array~FoundItem~
+    +search(keywords): Array~FoundItem~
+  }
+
+  class LostItem {
+    -id: int
+    -user_id: int
+    -firestore_id: string
+    -item_name: string
+    -category_id: int
+    -description: text
+    -last_seen_location: string
+    -lost_date: date
+    -image_url: string
+    -status: enum
+    -reward: string
+    -created_at: datetime
+    -updated_at: datetime
+    +create(itemData): LostItem
+    +getById(id): LostItem
+    +getByFirestoreId(id): LostItem
+    +updateStatus(id, status): boolean
+    +updateItem(id, itemData): boolean
+    +deleteItem(id): boolean
+    +getByUser(userId): Array~LostItem~
+    +getByCategory(categoryId): Array~LostItem~
+    +getAll(filters, pagination): Array~LostItem~
+    +search(keywords): Array~LostItem~
+  }
+
+  class ItemClaim {
+    -id: int
+    -user_id: int
+    -item_id: int
+    -description: text
+    -lost_location: string
+    -lost_date: date
+    -additional_proof: text
+    -status: enum
+    -admin_notes: text
+    -created_at: datetime
+    -updated_at: datetime
+    +create(claimData): ItemClaim
+    +getById(id): ItemClaim
+    +updateStatus(id, status, notes): boolean
+    +getByUser(userId): Array~ItemClaim~
+    +getByItem(itemId): Array~ItemClaim~
+    +getAll(filters, pagination): Array~ItemClaim~
+  }
+
+  class Category {
+    -id: int
+    -name: string
+    -description: text
+    -icon: string
+    -priority: int
+    -created_at: datetime
+    -updated_at: datetime
+    +create(categoryData): Category
+    +getById(id): Category
+    +update(id, categoryData): boolean
+    +delete(id): boolean
+    +getAll(): Array~Category~
+    +getFoundItemCount(id): int
+    +getLostItemCount(id): int
+  }
+
+  class Notification {
+    -id: int
+    -user_id: int
+    -title: string
+    -message: text
+    -type: string
+    -reference_id: int
+    -reference_type: string
+    -is_read: boolean
+    -created_at: datetime
+    +create(notificationData): Notification
+    +getById(id): Notification
+    +markAsRead(id): boolean
+    +markAllAsRead(userId): boolean
+    +getByUser(userId, filters): Array~Notification~
+    +getUnreadCount(userId): int
+    +delete(id): boolean
+  }
+
+  class Feedback {
+    -id: int
+    -user_id: int
+    -item_id: int
+    -rating: int
+    -comment: text
+    -created_at: datetime
+    +create(feedbackData): Feedback
+    +getById(id): Feedback
+    +getByUser(userId): Array~Feedback~
+    +getByItem(itemId): Array~Feedback~
+    +getAverageRating(itemId): float
+    +update(id, feedbackData): boolean
+    +delete(id): boolean
+  }
+
+  class AuthController {
+    +register(req, res): Response
+    +login(req, res): Response
+    +verifyEmail(req, res): Response
+    +forgotPassword(req, res): Response
+    +resetPassword(req, res): Response
+    +getProfile(req, res): Response
+    +updateProfile(req, res): Response
+  }
+
+  class ItemController {
+    +createFoundItem(req, res): Response
+    +createLostItem(req, res): Response
+    +getItem(req, res): Response
+    +updateItem(req, res): Response
+    +deleteItem(req, res): Response
+    +getItemsByUser(req, res): Response
+    +getItemsByCategory(req, res): Response
+    +searchItems(req, res): Response
+    +updateItemStatus(req, res): Response
+  }
+
+  class ClaimController {
+    +createClaim(req, res): Response
+    +getClaim(req, res): Response
+    +updateClaimStatus(req, res): Response
+    +getUserClaims(req, res): Response
+    +getItemClaims(req, res): Response
+  }
+
+  class NotificationController {
+    +getUserNotifications(req, res): Response
+    +markAsRead(req, res): Response
+    +markAllAsRead(req, res): Response
+    +deleteNotification(req, res): Response
+    +getUnreadCount(req, res): Response
+  }
+
+  class DatabaseService {
+    -connection: MySQLConnection
+    +connect(): boolean
+    +query(sql, params): Result
+    +beginTransaction(): void
+    +commit(): void
+    +rollback(): void
+    +close(): void
+  }
+
+  %% Relationships
+  User "1" -- "many" FoundItem : reports
+  User "1" -- "many" LostItem : reports
+  User "1" -- "many" ItemClaim : submits
+  User "1" -- "many" Notification : receives
+  User "1" -- "many" Feedback : gives
+  FoundItem "1" -- "many" ItemClaim : has
+  FoundItem "many" -- "1" Category : belongs to
+  LostItem "many" -- "1" Category : belongs to
+  FoundItem "1" -- "many" Feedback : receives
+  
+  AuthController -- User : manages
+  ItemController -- FoundItem : manages
+  ItemController -- LostItem : manages
+  ClaimController -- ItemClaim : manages
+  NotificationController -- Notification : manages
+  
+  User -- DatabaseService : uses
+  FoundItem -- DatabaseService : uses
+  LostItem -- DatabaseService : uses
+  ItemClaim -- DatabaseService : uses
+  Category -- DatabaseService : uses
+  Notification -- DatabaseService : uses
+  Feedback -- DatabaseService : uses

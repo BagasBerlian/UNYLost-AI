@@ -13,16 +13,19 @@ STOPWORDS_ID = set([
     'oleh', 'saya', 'kamu', 'dia', 'mereka', 'kami', 'kita', 'ada', 'bisa', 'dapat',
     'sudah', 'belum', 'jika', 'kalau', 'namun', 'tetapi', 'maka', 'sebagai', 'karena',
     'ketika', 'apabila', 'seperti', 'sebuah', 'suatu', 'bahwa', 'sangat', 'lebih', 'kurang',
-    'adalah', 'setelah', 'sebelum', 'selama', 'sesudah', 'melalui', 'terhadap'
-])
+    'atas', 'bawah', 'kiri', 'kanan', 'depan', 'belakang', 'samping', 'luar', 'antara',
+    'sekitar', 'melalui', 'terhadap', 'tentang', 'tanpa', 'setelah', 'sebelum', 'selama',
+    'sementara', 'sejak', 'hingga', 'sampai', 'saat', 'waktu', 'ketika'
+])  
 
 vectorizer = TfidfVectorizer(
     lowercase=True,
     ngram_range=(1, 3), 
-    max_features=20000,
+    max_features=15000, 
     min_df=1,  
-    max_df=0.9,
-    stop_words=list(STOPWORDS_ID)
+    max_df=0.95, 
+    stop_words=list(STOPWORDS_ID),  
+    sublinear_tf=True,  
 )
 
 def preprocess_text(text):
@@ -30,22 +33,13 @@ def preprocess_text(text):
         return ""
         
     text = text.lower()
-    
-    keywords = ["botol", "galon", "minum", "air", "dompet", "tas", "hitam", "merah", "biru", "putih"]
-    for keyword in keywords:
-        if keyword in text:
-            text = text.replace(keyword, f" {keyword} ")
-    
     text = re.sub(r'[^\w\s]', ' ', text)
-    text = re.sub(r'\d+', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
-    
-    print(f"Preprocessed text: '{text}'")
     return text
 
 def fit_vectorizer(descriptions):
     global vectorizer
-    preprocessed_descriptions = [preprocess_text(desc) for desc in descriptions]
+    preprocessed_descriptions = [preprocess_text(   ) for desc in descriptions]
     vectorizer.fit(preprocessed_descriptions)
     
     with open("app/models/tfidf_vectorizer.pkl", "wb") as f:
@@ -65,7 +59,15 @@ def extract_text_features(text):
     
     if not hasattr(vectorizer, 'vocabulary_') or vectorizer.vocabulary_ is None:
         if not load_vectorizer():
-            fit_vectorizer([preprocessed_text, "ini adalah data dummy"])
+            sample_docs = [
+                preprocessed_text,
+                "dompet hitam berisi kartu mahasiswa",
+                "laptop asus warna silver dengan stiker",
+                "kunci motor honda dengan gantungan",
+                "buku catatan berwarna merah", 
+                "kartu tanda mahasiswa atas nama mahasiswa"
+            ]
+            fit_vectorizer(sample_docs)
     
     features = vectorizer.transform([preprocessed_text])
     return features.toarray()[0]
@@ -77,36 +79,22 @@ def find_similar_items_by_text(query_text, threshold=0.2):
         similarities = []
 
         for item in found_data:
-            if "text_embedding" in item:
-                try:
-                    text_embedding = np.array(item["text_embedding"])
-                    if query_features.shape[0] != text_embedding.shape[0]:
-                        if "description" in item and item["description"]:
-                            text_embedding = extract_text_features(item["description"])
-                            db.collection("found_items").document(item["id"]).update({
-                                "text_embedding": text_embedding.tolist()
-                            })
-                    
-                    sim = float(cosine_similarity([query_features], [text_embedding])[0][0])
-                    
-                    if sim >= threshold:
-                        matching_item = {
-                            "id": item.get("id", ""),
-                            "item_name": item.get("item_name", ""),
-                            "description": item.get("description", ""),
-                            "score": sim,
-                            "match_type": "text"
-                        }
-                        
-                        for field in ["category", "location_found", "found_date", "image_url"]:
-                            if field in item:
-                                matching_item[field] = item[field]
-                        
-                        similarities.append(matching_item)
-                        
-                except Exception as e:
-                    print(f"Error calculating similarity for item {item.get('id')}: {str(e)}")
-                    continue
+            if "text_embedding" in item and len(item["text_embedding"]) > 0:
+                sim = cosine_similarity([query_features], [item["text_embedding"]])[0][0]
+                query_words = set(preprocess_text(query_text).split())
+                desc_words = set(preprocess_text(item.get("description", "")).split())
+                common_words = query_words.intersection(desc_words)
+                word_overlap_ratio = len(common_words) / max(len(query_words), 1)
+                adjusted_sim = sim * (1.0 + 0.5 * word_overlap_ratio)
+                adjusted_sim = min(adjusted_sim, 1.0)
+                
+                if adjusted_sim >= threshold:
+                    similarities.append({
+                        **item, 
+                        "score": float(adjusted_sim),
+                        "match_type": "text",
+                        "raw_score": float(sim) 
+                    })
 
         return sorted(similarities, key=lambda x: x["score"], reverse=True)
     except Exception as e:
@@ -155,6 +143,43 @@ def save_text_embedding_to_firebase(item_id, description):
     db.collection("found_items").document(item_id).update({
         "text_embedding": text_embedding.tolist()
     })
+    
+def refresh_all_text_embeddings():
+    docs = db.collection("found_items").stream()
+    updated_count = 0
+    
+    for doc in docs:
+        data = doc.to_dict()
+        description = data.get("description", "")
+        
+        if description:
+            text_embedding = extract_text_features(description)
+            db.collection("found_items").document(doc.id).update({
+                "text_embedding": text_embedding.tolist()
+            })
+            updated_count += 1
+    
+    return {"updated_count": updated_count}
+
+def test_text_similarity(text1, text2):
+    features1 = extract_text_features(text1)
+    features2 = extract_text_features(text2)
+    sim = cosine_similarity([features1], [features2])[0][0]
+    words1 = set(preprocess_text(text1).split())
+    words2 = set(preprocess_text(text2).split())
+    common_words = words1.intersection(words2)
+    word_overlap_ratio = len(common_words) / max(len(words1), len(words2), 1)
+    adjusted_sim = sim * (1.0 + 0.5 * word_overlap_ratio)
+    adjusted_sim = min(adjusted_sim, 1.0)
+    
+    return {
+        "raw_similarity": float(sim),
+        "adjusted_similarity": float(adjusted_sim),
+        "word_overlap_ratio": float(word_overlap_ratio),
+        "common_words": list(common_words),
+        "text1_words": list(words1),
+        "text2_words": list(words2)
+    }
     
 def train_tfidf_with_data():
     docs = db.collection("found_items").stream()
