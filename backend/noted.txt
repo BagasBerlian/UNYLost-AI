@@ -1,0 +1,111 @@
+# Untuk membuat Token JWT menggunakan NodeJS 
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+
+POST http://localhost:5000/api/auth/login
+{
+  "email": "admin@unylost.com",
+  "password": "admin123"
+}
+{
+    "email" : "human2eror@gmail.com",
+    "password" : "123456",
+}
+
+# Found Items API
+
+## Dasar
+GET /api/found-items - Dapatkan semua barang temuan ✅
+GET /api/found-items/:id - Dapatkan barang temuan berdasarkan ID ✅
+POST /api/found-items - Laporkan barang temuan baru ✅
+PUT /api/found-items/:id - Update barang temuan ✅
+DeELETE /api/found-items/:id - Delete barang temuan (Hanya penemu dan admin) ✅
+
+## Filter & Pencarian
+GET /api/found-items/search?q=keyword - Cari barang temuan berdasarkan kata kunci
+GET /api/found-items/category/:categoryId - Dapatkan barang temuan berdasarkan kategori
+GET /api/found-items/my-items - Dapatkan barang temuan milik user yang login
+GET /api/found-items/user/:userId - Dapatkan barang temuan berdasarkan user ID (admin only)
+
+## Manajemen Gambar
+POST /api/found-items/:id/images - Tambahkan gambar ke barang temuan
+DELETE /api/found-items/:id/images/:imageId - Hapus gambar dari barang temuan
+PUT /api/found-items/:id/images/:imageId/primary - Set gambar sebagai primary
+
+## AI Integration
+POST /api/found-items/find-matches - Cari barang yang cocok menggunakan AI
+
+## Status
+PUT /api/found-items/:id/status - Update status barang temuan (admin only)
+
+# Lost Items API
+
+## Dasar
+GET /api/lost-items - Dapatkan semua barang hilang
+GET /api/lost-items/:id - Dapatkan barang hilang berdasarkan ID
+POST /api/lost-items - Laporkan barang hilang baru
+PUT /api/lost-items/:id - Update barang hilang
+DELETE /api/lost-items/:id - Delete barang hilang (Hanya pemilik dan admin)
+
+## Filter & Pencarian
+GET /api/lost-items/search?q=keyword - Cari barang hilang berdasarkan kata kunci
+GET /api/lost-items/category/:categoryId - Dapatkan barang hilang berdasarkan kategori
+GET /api/lost-items/my-items - Dapatkan barang hilang milik user yang login
+GET /api/lost-items/user/:userId - Dapatkan barang hilang berdasarkan user ID (admin only)
+
+## Manajemen Gambar
+POST /api/lost-items/:id/images - Tambahkan gambar ke barang hilang
+DELETE /api/lost-items/:id/images/:imageId - Hapus gambar dari barang hilang
+PUT /api/lost-items/:id/images/:imageId/primary - Set gambar sebagai primary
+
+## AI Integration
+GET /api/lost-items/:id/matches - Dapatkan barang temuan yang mungkin cocok
+
+## Status
+PUT /api/lost-items/:id/status - Update status barang hilang
+
+# Claims API
+
+## Dasar
+GET /api/claims - Dapatkan semua klaim (admin only)
+GET /api/claims/:id - Dapatkan klaim berdasarkan ID
+POST /api/claims - Buat klaim baru
+PUT /api/claims/:id/status - Update status klaim (admin only)
+
+## Filter
+GET /api/claims/my-claims - Dapatkan klaim milik user yang login
+GET /api/claims/user/:userId - Dapatkan klaim berdasarkan user ID (admin only)
+GET /api/claims/item/:itemId - Dapatkan klaim untuk barang tertentu
+
+# Categories API
+
+## Dasar
+GET /api/categories - Dapatkan semua kategori ✅
+GET /api/categories/:id - Dapatkan kategori berd asarkan ID ✅
+POST /api/categories - Tambahkan kategori baru (memerlukan admin) ✅
+PUT /api/categories/:id - Update kategori (memerlukan admin) ✅
+DELETE /api/categories/:id - Hapus kategori (memerlukan admin) ✅
+
+catatan : ketika menambahkan nama categori yang sama seharusnya tidak bisa (name tidak unique)
+
+# Authentication API
+
+## Dasar
+POST /api/auth/register - Daftar user baru
+POST /api/auth/login - Login user
+GET /api/auth/verify/:token - Verifikasi email
+POST /api/auth/forgot-password - Request reset password
+POST /api/auth/reset-password/:token - Reset password
+
+# User API
+
+## Dasar
+GET /api/users/profile - Dapatkan profil user yang login
+PUT /api/users/profile - Update profil user
+PUT /api/users/password - Ganti password
+
+# Admin API
+
+## Dasar
+GET /api/admin/dashboard - Dapatkan data dashboard (admin only)
+GET /api/admin/users - Dapatkan daftar user (admin only)
+PUT /api/admin/users/:userId/role - Update role user (admin only)

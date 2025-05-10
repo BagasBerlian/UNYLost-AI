@@ -2,6 +2,10 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const authRoutes = require("./routes/auth");
+const categoryRoutes = require("./routes/categories");
+const foundItemRoutes = require("./routes/foundItems");
+const lostItemRoutes = require("./routes/lostItems");
+const claimRoutes = require("./routes/claims");
 const db = require("./config/database");
 
 const app = express();
@@ -21,6 +25,12 @@ db.connect((err) => {
 app.get("/", (req, res) => {
   res.send("UNYLost API is running");
 });
+
+app.use("/api/auth", authRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/found-items", foundItemRoutes);
+app.use("/api/lost-items", lostItemRoutes);
+app.use("/api/claims", claimRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
