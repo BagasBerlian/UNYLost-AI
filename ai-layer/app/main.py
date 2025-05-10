@@ -8,8 +8,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from app.services.firebase import db
 
-
-
 os.makedirs("app/models", exist_ok=True)
 os.makedirs("app/embeddings", exist_ok=True)
 os.makedirs("temp_images", exist_ok=True)
