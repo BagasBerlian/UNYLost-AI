@@ -17,7 +17,7 @@ module.exports = (req, res, next) => {
       }
 
       db.query(
-        "SELECT id, email, full_name FROM users WHERE id = ?",
+        "SELECT id, email, full_name, role FROM users WHERE id = ?",
         [decoded.id],
         (error, results) => {
           if (error) {

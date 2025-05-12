@@ -2,6 +2,9 @@ const LostItem = require("../models/LostItem");
 const Category = require("../models/Category");
 const { validationResult } = require("express-validator");
 const axios = require("axios");
+const fs = require("fs");
+const FormData = require("form-data");
+const path = require("path");
 
 const aiLayerBaseUrl = process.env.AI_LAYER_URL || "http://localhost:8000";
 
@@ -9,6 +12,7 @@ exports.createLostItem = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(400).json({ errors: errors.array() });
     }
 
@@ -18,16 +22,15 @@ exports.createLostItem = async (req, res) => {
       description,
       last_seen_location,
       lost_date,
-      image_url,
       reward,
     } = req.body;
+    const userId = req.user.id;
 
     const category = await Category.getById(category_id);
     if (!category) {
+      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(400).json({ message: "Invalid category" });
     }
-
-    const userId = req.user.id;
 
     const itemData = {
       user_id: userId,
@@ -36,62 +39,76 @@ exports.createLostItem = async (req, res) => {
       description,
       last_seen_location,
       lost_date,
-      image_url,
       reward,
       status: "active",
     };
 
-    let firestoreId = null;
-    if (image_url) {
-      try {
-        const aiResponse = await axios.post(
-          `${aiLayerBaseUrl}/image-matcher/add-lost-item`,
-          {
-            item_name,
-            description,
-            location: last_seen_location,
-            category: category.name,
-            file_url: image_url,
-            owner_id: userId.toString(),
-            reward,
-          }
-        );
-
-        if (aiResponse.data && aiResponse.data.item_id) {
-          firestoreId = aiResponse.data.item_id;
-          itemData.firestore_id = firestoreId;
-        }
-      } catch (aiError) {
-        console.error("Error communicating with AI layer:", aiError);
-      }
+    if (req.file) {
+      const localImageUrl = `/uploads/${path.basename(req.file.path)}`;
+      itemData.image_url = localImageUrl;
     }
 
     const newItem = await LostItem.create(itemData);
 
     let matches = [];
-    try {
-      const matchResponse = await axios.post(
-        `${aiLayerBaseUrl}/hybrid-matcher/match`,
-        {
-          query: description,
-          image_url,
-          image_threshold: 0.7,
-          text_threshold: 0.2,
-        }
-      );
-      matches = matchResponse.data.matches || [];
-    } catch (matchError) {
-      console.error("Error finding matches:", matchError);
+    if (req.file && (description || item_name)) {
+      try {
+        const form = new FormData();
+        const queryText = description || item_name;
+        form.append("query", queryText);
+
+        const fileStream = fs.createReadStream(req.file.path);
+        form.append("file", fileStream, {
+          filename: req.file.originalname || "image.jpg",
+          contentType: req.file.mimetype || "image/jpeg",
+        });
+
+        console.log("Sending hybrid matching request to AI Layer...");
+        const matchResponse = await axios.post(
+          `${aiLayerBaseUrl}/hybrid-matcher/match`,
+          form,
+          { headers: { ...form.getHeaders() } }
+        );
+
+        console.log("Hybrid matching results:", matchResponse.data);
+        matches = matchResponse.data.matches || [];
+      } catch (aiError) {
+        console.error("Error communicating with AI Layer:", aiError.message);
+        console.log(
+          "Error details:",
+          aiError.response?.data || "No detailed error info"
+        );
+      }
+    } else if (description) {
+      try {
+        console.log("Sending text matching request to AI Layer...");
+        const matchResponse = await axios.get(
+          `${aiLayerBaseUrl}/text-matcher/search`,
+          { params: { q: description, threshold: 0.2 } }
+        );
+
+        console.log("Text matching results:", matchResponse.data);
+        matches = matchResponse.data.matches || [];
+      } catch (error) {
+        console.error("Error in text matching:", error.message);
+        console.log(
+          "Error details:",
+          error.response?.data || "No detailed error info"
+        );
+      }
     }
 
     res.status(201).json({
       message: "Lost item created successfully",
       item: newItem,
-      firestore_id: firestoreId,
-      potential_matches: matches.length > 0 ? matches.slice(0, 5) : [],
+      image_url: itemData.image_url || null,
+      potential_matches: matches.length > 0 ? matches : [],
     });
   } catch (error) {
     console.error("Error creating lost item:", error);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     res.status(500).json({ message: "Server error" });
   }
 };

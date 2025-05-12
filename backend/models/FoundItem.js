@@ -199,12 +199,12 @@ class FoundItem {
       const searchKeyword = `%${keywords}%`;
       db.query(
         `SELECT f.*, c.name as category_name, u.full_name as reporter_name 
-         FROM found_items f 
-         JOIN categories c ON f.category_id = c.id 
-         JOIN users u ON f.user_id = u.id 
-         WHERE f.item_name LIKE ? OR f.description LIKE ? 
-         ORDER BY f.created_at DESC 
-         LIMIT ? OFFSET ?`,
+       FROM found_items f 
+       JOIN categories c ON f.category_id = c.id 
+       JOIN users u ON f.user_id = u.id 
+       WHERE f.item_name LIKE ? OR f.description LIKE ? 
+       ORDER BY f.created_at DESC 
+       LIMIT ? OFFSET ?`,
         [searchKeyword, searchKeyword, limit, offset],
         (error, results) => {
           if (error) {

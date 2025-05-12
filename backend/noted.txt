@@ -8,7 +8,7 @@ POST http://localhost:5000/api/auth/login
 }
 {
     "email" : "human2eror@gmail.com",
-    "password" : "123456",
+    "password" : "123456"
 }
 
 # Found Items API
@@ -21,10 +21,10 @@ PUT /api/found-items/:id - Update barang temuan ✅
 DeELETE /api/found-items/:id - Delete barang temuan (Hanya penemu dan admin) ✅
 
 ## Filter & Pencarian
-GET /api/found-items/search?q=keyword - Cari barang temuan berdasarkan kata kunci
-GET /api/found-items/category/:categoryId - Dapatkan barang temuan berdasarkan kategori
-GET /api/found-items/my-items - Dapatkan barang temuan milik user yang login
-GET /api/found-items/user/:userId - Dapatkan barang temuan berdasarkan user ID (admin only)
+GET /api/found-items/search?q=keyword - Cari barang temuan berdasarkan kata kunci (admin only) ✅
+GET /api/found-items/category/:categoryId - Dapatkan barang temuan berdasarkan kategori (admin only) ✅
+GET /api/found-items/my-items - Dapatkan barang temuan milik user yang login ✅
+GET /api/found-items/user/:userId - Dapatkan barang temuan berdasarkan user ID (admin only) ✅
 
 ## Manajemen Gambar
 POST /api/found-items/:id/images - Tambahkan gambar ke barang temuan
@@ -40,11 +40,11 @@ PUT /api/found-items/:id/status - Update status barang temuan (admin only)
 # Lost Items API
 
 ## Dasar
-GET /api/lost-items - Dapatkan semua barang hilang
-GET /api/lost-items/:id - Dapatkan barang hilang berdasarkan ID
-POST /api/lost-items - Laporkan barang hilang baru
-PUT /api/lost-items/:id - Update barang hilang
-DELETE /api/lost-items/:id - Delete barang hilang (Hanya pemilik dan admin)
+GET /api/lost-items - Dapatkan semua barang hilang (admin only) ✅
+GET /api/lost-items/:id - Dapatkan barang hilang berdasarkan ID (admin only) ✅
+POST /api/lost-items - Laporkan barang hilang baru ✅
+PUT /api/lost-items/:id - Update barang hilang ✅
+DELETE /api/lost-items/:id - Delete barang hilang (Hanya pemilik dan admin) ✅
 
 ## Filter & Pencarian
 GET /api/lost-items/search?q=keyword - Cari barang hilang berdasarkan kata kunci
@@ -80,7 +80,7 @@ GET /api/claims/item/:itemId - Dapatkan klaim untuk barang tertentu
 
 ## Dasar
 GET /api/categories - Dapatkan semua kategori ✅
-GET /api/categories/:id - Dapatkan kategori berd asarkan ID ✅
+GET /api/categories/:id - Dapatkan kategori berdasarkan ID ✅
 POST /api/categories - Tambahkan kategori baru (memerlukan admin) ✅
 PUT /api/categories/:id - Update kategori (memerlukan admin) ✅
 DELETE /api/categories/:id - Hapus kategori (memerlukan admin) ✅
@@ -107,5 +107,5 @@ PUT /api/users/password - Ganti password
 
 ## Dasar
 GET /api/admin/dashboard - Dapatkan data dashboard (admin only)
-GET /api/admin/users - Dapatkan daftar user (admin only)
+GET /api/admin/users - Dapatkan daftar user (admin only) ✅
 PUT /api/admin/users/:userId/role - Update role user (admin only)

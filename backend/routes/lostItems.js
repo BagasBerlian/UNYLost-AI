@@ -4,6 +4,39 @@ const { body } = require("express-validator");
 const lostItemController = require("../controllers/lostItemController");
 const authMiddleware = require("../middleware/auth");
 const adminMiddleware = require("../middleware/admin");
+const multer = require("multer");
+const path = require("path");
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/");
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + "-" + uniqueSuffix + ext);
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  if (
+    file.mimetype === "image/jpeg" ||
+    file.mimetype === "image/png" ||
+    file.mimetype === "image/jpg"
+  ) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only JPEG, JPG, and PNG files are allowed"), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+  fileFilter: fileFilter,
+});
 
 const lostItemValidation = [
   body("item_name").notEmpty().withMessage("Nama barang harus diisi"),
@@ -17,7 +50,11 @@ const lostItemValidation = [
   body("reward").optional(),
 ];
 
-router.get("/", lostItemController.getAllLostItems);
+router.get(
+  "/",
+  [authMiddleware, adminMiddleware],
+  lostItemController.getAllLostItems
+);
 router.get("/search", lostItemController.searchLostItems);
 router.get("/my-items", authMiddleware, lostItemController.getLostItemsByUser);
 router.get(
@@ -33,10 +70,15 @@ router.get(
 );
 router.post(
   "/",
-  [authMiddleware, ...lostItemValidation],
+  [authMiddleware, upload.single("image"), ...lostItemValidation],
   lostItemController.createLostItem
 );
-router.get("/:id", lostItemController.getLostItemById);
+
+router.get(
+  "/:id",
+  [authMiddleware, adminMiddleware],
+  lostItemController.getLostItemById
+);
 router.put(
   "/:id",
   [authMiddleware, ...lostItemValidation],

@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const authRoutes = require("./routes/auth");
+const adminRoutes = require("./routes/adminRoutes");
 const categoryRoutes = require("./routes/categories");
 const foundItemRoutes = require("./routes/foundItems");
 const lostItemRoutes = require("./routes/lostItems");
@@ -13,6 +14,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/uploads", express.static("uploads"));
 
 db.connect((err) => {
   if (err) {
@@ -31,6 +33,7 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/found-items", foundItemRoutes);
 app.use("/api/lost-items", lostItemRoutes);
 app.use("/api/claims", claimRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

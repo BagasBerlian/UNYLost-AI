@@ -48,12 +48,10 @@ const foundItemValidation = [
 
 router.get("/", foundItemController.getAllFoundItems);
 
-router.get("/search", foundItemController.searchFoundItems);
-
 router.get(
-  "/my-items",
-  authMiddleware,
-  foundItemController.getFoundItemsByUser
+  "/search",
+  [authMiddleware, adminMiddleware],
+  foundItemController.searchFoundItems
 );
 
 router.get(
@@ -63,7 +61,14 @@ router.get(
 );
 
 router.get(
+  "/my-items",
+  authMiddleware,
+  foundItemController.getFoundItemsByUser
+);
+
+router.get(
   "/category/:categoryId",
+  [authMiddleware, adminMiddleware],
   foundItemController.getFoundItemsByCategory
 );
 

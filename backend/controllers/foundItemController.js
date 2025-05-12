@@ -294,6 +294,7 @@ exports.deleteFoundItem = async (req, res) => {
 
 exports.getFoundItemsByUser = async (req, res) => {
   try {
+    // console.log("Current user:", req.user);
     const userId = req.params.userId || req.user.id;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;

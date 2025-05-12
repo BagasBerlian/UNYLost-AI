@@ -15,8 +15,8 @@ const categoryValidation = [
     .withMessage("Prioritas harus berupa angka positif"),
 ];
 
-router.get("/", categoryController.getAllCategories);
-router.get("/:id", categoryController.getCategoryById);
+router.get("/", authMiddleware, categoryController.getAllCategories);
+router.get("/:id", authMiddleware, categoryController.getCategoryById);
 router.post(
   "/",
   [authMiddleware, adminMiddleware, ...categoryValidation],

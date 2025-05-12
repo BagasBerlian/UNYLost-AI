@@ -28,6 +28,7 @@ backend/node_modules/
 backend/.env
 backend/config/firebase_key.json
 backend/logs/
+backend/uploads/
 
 # Frontend - React Native/Expo
 frontend/node_modules/
