@@ -6,8 +6,8 @@ import os
 import uuid
 from datetime import datetime
 import traceback
-import json
 import logging
+from app.services.firebase import db
 from app.services.firebase_storage import get_item_by_id, update_item_status
 from app.services.upload_to_drive import upload_to_drive
 from app.services.image_encoder import (
@@ -273,3 +273,78 @@ async def match_multiple_images(
         logger.error(f"Error in multi-image matching: {str(e)}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error processing images: {str(e)}")
+
+@router.post("/items/{item_id}/images")
+async def add_item_images(
+    item_id: str,
+    files: List[UploadFile] = File(...),
+):
+    try:
+        item = get_item_by_id(item_id, collection="found_items")
+        if not item:
+            raise HTTPException(status_code=404, detail=f"Item with ID {item_id} not found")
+        
+        images = []
+        file_paths = []
+        
+        for file in files:
+            file_content = await file.read()
+            try:
+                image = Image.open(BytesIO(file_content)).convert("RGB")
+                images.append(image)
+                
+                os.makedirs("temp_images", exist_ok=True)
+                file_path = f"temp_images/{uuid.uuid4()}_{file.filename}"
+                with open(file_path, "wb") as f:
+                    f.write(file_content)
+                file_paths.append(file_path)
+            except Exception as img_error:
+                logger.error(f"Error processing image {file.filename}: {str(img_error)}")
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Error processing image {file.filename}: {str(img_error)}"
+                )
+        
+        image_urls = []
+        for file_path in file_paths:
+            image_url = upload_to_drive(file_path, os.path.basename(file_path))
+            image_urls.append(image_url)
+        
+        current_item_data = db.collection("found_items").document(item_id).get().to_dict()
+        
+        if "additional_images" in current_item_data:
+            additional_images = current_item_data["additional_images"]
+        else:
+            additional_images = []
+        
+        additional_images.extend(image_urls)
+        
+        db.collection("found_items").document(item_id).update({
+            "additional_images": additional_images,
+            "updated_at": datetime.now().isoformat()
+        })
+        
+        for file_path in file_paths:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
+        return {
+            "success": True,
+            "item_id": item_id,
+            "image_urls": image_urls,
+            "total_images": len(additional_images) + 1,  
+            "message": "Images added successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding images to item: {str(e)}")
+        traceback.print_exc()
+        
+        if 'file_paths' in locals():
+            for file_path in file_paths:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    
+        raise HTTPException(status_code=500, detail=f"Error adding images to item: {str(e)}")

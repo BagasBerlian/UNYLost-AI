@@ -46,7 +46,11 @@ const foundItemValidation = [
   body("found_date").notEmpty().withMessage("Tanggal ditemukan harus diisi"),
 ];
 
-router.get("/", foundItemController.getAllFoundItems);
+router.get(
+  "/",
+  [authMiddleware, adminMiddleware],
+  foundItemController.getAllFoundItems
+);
 
 router.get(
   "/search",

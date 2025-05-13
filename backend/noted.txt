@@ -27,7 +27,7 @@ GET /api/found-items/my-items - Dapatkan barang temuan milik user yang login ✅
 GET /api/found-items/user/:userId - Dapatkan barang temuan berdasarkan user ID (admin only) ✅
 
 ## Manajemen Gambar
-POST /api/found-items/:id/images - Tambahkan gambar ke barang temuan
+POST /api/found-items/:id/images - Tambahkan gambar ke barang temuan ✅
 DELETE /api/found-items/:id/images/:imageId - Hapus gambar dari barang temuan
 PUT /api/found-items/:id/images/:imageId/primary - Set gambar sebagai primary
 

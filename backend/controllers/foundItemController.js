@@ -83,6 +83,7 @@ exports.createFoundItem = async (req, res) => {
             is_primary: true,
           });
 
+          await FoundItem.update(itemId, { image_url: primaryImageUrl });
           imageUrls.push(primaryImageUrl);
 
           if (
@@ -534,6 +535,8 @@ exports.addItemImages = async (req, res) => {
 
     const newImages = [];
 
+    console.log(`Checking firestore_id for item ${itemId}:`, item.firestore_id);
+
     if (item.firestore_id) {
       try {
         const form = new FormData();
@@ -546,6 +549,9 @@ exports.addItemImages = async (req, res) => {
           });
         });
 
+        console.log(
+          `Trying to upload images to AI layer for item ${item.firestore_id}`
+        );
         const aiResponse = await axios.post(
           `${aiLayerBaseUrl}/image-matcher/items/${item.firestore_id}/images`,
           form,
@@ -555,6 +561,8 @@ exports.addItemImages = async (req, res) => {
             },
           }
         );
+
+        console.log("AI Layer response:", aiResponse.data);
 
         if (
           aiResponse.data &&
@@ -574,12 +582,29 @@ exports.addItemImages = async (req, res) => {
 
             newImages.push(newImage);
           }
+        } else {
+          console.error("AI Layer did not return image URLs");
         }
       } catch (aiError) {
-        console.error("Error adding images to AI layer:", aiError);
+        console.error("Error adding images to AI layer:", aiError.message);
+        console.error(
+          "AI Layer error details:",
+          aiError.response?.data || "No detailed error info"
+        );
+
+        // Tambahkan log error untuk debugging
+        if (aiError.response) {
+          console.error("AI Layer response status:", aiError.response.status);
+          console.error("AI Layer response headers:", aiError.response.headers);
+        }
       }
+    } else {
+      console.log(
+        `Item ${itemId} has no firestore_id, skipping AI Layer upload`
+      );
     }
 
+    // Jika tidak ada gambar yang berhasil ditambahkan melalui AI layer, tambahkan secara lokal
     if (newImages.length === 0) {
       const existingImages = await FoundItemImage.getByItemId(itemId);
       const hasPrimary = existingImages.some((img) => img.is_primary);
@@ -596,6 +621,11 @@ exports.addItemImages = async (req, res) => {
 
         newImages.push(newImage);
       }
+
+      // Tambahkan peringatan bahwa gambar hanya disimpan secara lokal
+      console.log(
+        `Images for item ${itemId} saved only locally, not in AI Layer`
+      );
     }
 
     const images = await FoundItemImage.getByItemId(itemId);
@@ -707,6 +737,11 @@ exports.setPrimaryImage = async (req, res) => {
     }
 
     await FoundItemImage.setPrimary(imageId, itemId);
+
+    const primaryImage = await FoundItemImage.getById(imageId);
+    if (primaryImage) {
+      await FoundItem.update(itemId, { image_url: primaryImage.image_url });
+    }
 
     if (item.firestore_id) {
       try {
