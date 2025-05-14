@@ -1,5 +1,6 @@
 const FoundItem = require("../models/FoundItem");
 const FoundItemImage = require("../models/FoundItemImage");
+const LostItem = require("../models/LostItem");
 const Category = require("../models/Category");
 const { validationResult } = require("express-validator");
 const axios = require("axios");
@@ -273,11 +274,30 @@ exports.deleteFoundItem = async (req, res) => {
 
     if (existingItem.firestore_id) {
       try {
-        await axios.delete(
+        console.log(
+          `Mencoba menghapus item dari AI Layer: ${existingItem.firestore_id}`
+        );
+
+        const aiResponse = await axios.delete(
           `${aiLayerBaseUrl}/image-matcher/items/${existingItem.firestore_id}`
         );
+
+        console.log("Respons dari AI Layer:", aiResponse.data);
       } catch (aiError) {
-        console.error("Error deleting item in AI layer:", aiError);
+        console.error("Error deleting item in AI layer:", aiError.message);
+
+        if (aiError.response) {
+          console.error("Status error:", aiError.response.status);
+          console.error("Data error:", aiError.response.data);
+        } else if (aiError.request) {
+          console.error("Tidak ada respons dari server AI Layer");
+        } else {
+          console.error("Error setup request:", aiError.message);
+        }
+
+        console.log(
+          "Item dihapus dari MySQL tetapi mungkin masih ada di Firestore"
+        );
       }
     }
 
@@ -745,14 +765,32 @@ exports.setPrimaryImage = async (req, res) => {
 
     if (item.firestore_id) {
       try {
-        await axios.put(
+        console.log(
+          `Menetapkan gambar utama di AI Layer untuk item ${item.firestore_id}: ${image.image_url}`
+        );
+
+        const aiResponse = await axios.put(
           `${aiLayerBaseUrl}/image-matcher/items/${item.firestore_id}/primary-image`,
           {
             image_url: image.image_url,
           }
         );
+
+        console.log("Respons dari AI Layer:", aiResponse.data);
       } catch (aiError) {
-        console.error("Error updating primary image in AI layer:", aiError);
+        console.error(
+          "Error menetapkan gambar utama di AI layer:",
+          aiError.message
+        );
+
+        if (aiError.response) {
+          console.error("Status error:", aiError.response.status);
+          console.error("Data error:", aiError.response.data);
+        } else if (aiError.request) {
+          console.error("Tidak ada respons dari server AI Layer");
+        } else {
+          console.error("Error setup request:", aiError.message);
+        }
       }
     }
 
@@ -770,30 +808,49 @@ exports.setPrimaryImage = async (req, res) => {
 
 exports.findMatchingItems = async (req, res) => {
   try {
-    const { description, image_url } = req.body;
+    const { description } = req.body;
+    const file = req.file;
 
-    if (!description && !image_url) {
+    if (!description && !file) {
       return res
         .status(400)
-        .json({ message: "Either description or image_url is required" });
+        .json({ message: "Either description or image file is required" });
     }
+
+    console.log(`Mencari barang hilang yang cocok dengan barang temuan...`);
+    console.log(`Deskripsi: ${description || "tidak ada"}`);
+    console.log(`File gambar: ${file ? file.originalname : "tidak ada"}`);
 
     let matches = [];
 
     try {
-      if (image_url) {
-        const response = await axios.get(
-          `${aiLayerBaseUrl}/hybrid-matcher/search`,
+      if (file) {
+        const form = new FormData();
+
+        if (description) {
+          form.append("query", description);
+        }
+
+        const fileStream = fs.createReadStream(file.path);
+        form.append("file", fileStream, {
+          filename: file.originalname || "image.jpg",
+          contentType: file.mimetype || "image/jpeg",
+        });
+
+        const response = await axios.post(
+          `${aiLayerBaseUrl}/hybrid-matcher/match`,
+          form,
           {
+            headers: { ...form.getHeaders() },
             params: {
-              q: description || "",
-              image_url,
-              image_threshold: 0.3,
-              text_threshold: 0.2,
+              collection: "lost_items",
             },
+            timeout: 30000,
           }
         );
+
         matches = response.data.matches || [];
+        console.log(`Ditemukan ${matches.length} kecocokan hybrid`);
       } else if (description) {
         const response = await axios.get(
           `${aiLayerBaseUrl}/text-matcher/search`,
@@ -801,39 +858,124 @@ exports.findMatchingItems = async (req, res) => {
             params: {
               q: description,
               threshold: 0.2,
+              collection: "lost_items",
             },
+            timeout: 30000,
           }
         );
         matches = response.data.matches || [];
+        console.log(`Ditemukan ${matches.length} kecocokan teks`);
       }
     } catch (aiError) {
-      console.error("Error communicating with AI layer:", aiError);
-      return res.status(500).json({ message: "Error finding matching items" });
+      console.error("Error berkomunikasi dengan AI layer:", aiError.message);
+
+      if (aiError.response) {
+        console.error("Status error:", aiError.response.status);
+        console.error("Data error:", aiError.response.data);
+      }
+
+      return res.status(200).json({
+        message: "Could not communicate with AI layer properly",
+        matches: [],
+        total_matches: 0,
+      });
+    } finally {
+      if (file && fs.existsSync(file.path)) {
+        try {
+          fs.unlinkSync(file.path);
+        } catch (error) {
+          console.error("Error deleting temporary file:", error);
+        }
+      }
     }
 
     const matchedItems = [];
+    const db = require("../config/database");
+
     for (const match of matches) {
       if (match.id) {
-        const item = await FoundItem.getByFirestoreId(match.id);
-        if (item) {
-          const images = await FoundItemImage.getByItemId(item.id);
+        try {
+          console.log(
+            `Mencari item dengan firestore_id ${match.id} di database MySQL...`
+          );
 
+          const results = await new Promise((resolve, reject) => {
+            db.query(
+              `SELECT l.*, c.name as category_name, u.full_name as owner_name 
+               FROM lost_items l 
+               JOIN categories c ON l.category_id = c.id 
+               JOIN users u ON l.user_id = u.id 
+               WHERE l.firestore_id = ?`,
+              [match.id],
+              (error, results) => {
+                if (error) {
+                  console.error(
+                    `Error querying database for item ${match.id}:`,
+                    error
+                  );
+                  resolve([]);
+                } else {
+                  resolve(results || []);
+                }
+              }
+            );
+          });
+
+          if (results.length > 0) {
+            const item = results[0];
+            matchedItems.push({
+              ...item,
+              match_score: match.score,
+              match_type: match.match_type,
+              source: "mysql",
+            });
+            console.log(`Item found in MySQL: ${item.id}`);
+          } else {
+            console.log(`Item not found in MySQL, using data from AI Layer`);
+            matchedItems.push({
+              id: null,
+              item_name: match.item_name || "Unknown item",
+              description: match.description || "",
+              last_seen_location: match.last_seen_location || "",
+              lost_date: match.date_lost || "",
+              category_name: match.category || "Unknown",
+              image_url: match.image_url || "",
+              firestore_id: match.id,
+              match_score: match.score,
+              match_type: match.match_type,
+              source: "firestore",
+            });
+          }
+        } catch (dbError) {
+          console.error(
+            `Error querying database for item ${match.id}:`,
+            dbError
+          );
           matchedItems.push({
-            ...item,
-            images,
+            id: null,
+            item_name: match.item_name || "Unknown item",
+            description: match.description || "",
+            last_seen_location: match.last_seen_location || "",
+            lost_date: match.date_lost || "",
+            category_name: match.category || "Unknown",
+            image_url: match.image_url || "",
+            firestore_id: match.id,
             match_score: match.score,
             match_type: match.match_type,
+            source: "firestore",
           });
         }
       }
     }
 
     res.status(200).json({
+      message: "Lost items that match your found item",
+      direction: "found → lost",
       matches: matchedItems,
       total_matches: matchedItems.length,
     });
   } catch (error) {
     console.error("Error finding matching items:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };

@@ -6,6 +6,7 @@ const authMiddleware = require("../middleware/auth");
 const adminMiddleware = require("../middleware/admin");
 const multer = require("multer");
 const path = require("path");
+const { route } = require("./foundItems");
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -94,6 +95,12 @@ router.put(
       .withMessage("Status tidak valid"),
   ],
   lostItemController.updateLostItemStatus
+);
+
+router.post(
+  "/find-matches",
+  [authMiddleware, upload.single("image")],
+  lostItemController.findMatchingItems
 );
 
 module.exports = router;

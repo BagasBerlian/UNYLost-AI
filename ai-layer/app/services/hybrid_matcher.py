@@ -15,7 +15,8 @@ def find_items_hybrid(
     text_threshold: float = 0.2,
     image_weight: float = 0.4,  
     text_weight: float = 0.6,  
-    max_results: int = 10
+    max_results: int = 10,
+    collection: str = "found_items"
 ) -> List[Dict]:
     if image is None and not text:
         raise ValueError("Setidaknya satu dari gambar atau teks harus disediakan")
@@ -32,7 +33,7 @@ def find_items_hybrid(
     
     if image is not None:
         image_embedding = extract_features(image)
-        image_matches = find_similar_items(image_embedding, threshold=image_threshold)
+        image_matches = find_similar_items(image_embedding, threshold=image_threshold, collection=collection)
         
         for item in image_matches:
             item_id = item["id"]
@@ -46,7 +47,7 @@ def find_items_hybrid(
         logger.info(f"Ditemukan {len(image_matches)} kecocokan gambar")
     
     if text:
-        text_matches = find_similar_items_by_text(text, threshold=text_threshold)
+        text_matches = find_similar_items_by_text(text, threshold=text_threshold, collection=collection)
         
         for item in text_matches:
             item_id = item["id"]

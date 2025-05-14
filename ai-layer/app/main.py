@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import image_matcher, text_matcher, hybrid_matcher
+from app.routers import image_matcher, text_matcher, hybrid_matcher, lost_items
 import os
 from app.services.text_encoder import train_tfidf_with_data
 from app.services.text_encoder import extract_text_features, load_text_embeddings_from_firebase, preprocess_text
@@ -30,6 +30,7 @@ app.add_middleware(
 app.include_router(image_matcher.router)
 app.include_router(text_matcher.router)
 app.include_router(hybrid_matcher.router)
+app.include_router(lost_items.router)
 
 @app.get("/")
 async def root():

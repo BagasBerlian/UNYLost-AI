@@ -4,7 +4,10 @@ import numpy as np
 import pickle
 import os
 import re
+import logging
 from app.services.firebase import db
+
+logger = logging.getLogger(__name__)
 
 
 STOPWORDS_ID = set([
@@ -72,10 +75,10 @@ def extract_text_features(text):
     features = vectorizer.transform([preprocessed_text])
     return features.toarray()[0]
 
-def find_similar_items_by_text(query_text, threshold=0.2):
+def find_similar_items_by_text(query_text, threshold=0.2, collection="found_items"):
     try:
         query_features = extract_text_features(query_text)
-        found_data = load_text_embeddings_from_firebase()
+        found_data = load_text_embeddings_from_firebase(collection=collection)
         similarities = []
 
         for item in found_data:
@@ -98,13 +101,13 @@ def find_similar_items_by_text(query_text, threshold=0.2):
 
         return sorted(similarities, key=lambda x: x["score"], reverse=True)
     except Exception as e:
-        print(f"Error in find_similar_items_by_text: {str(e)}")
+        logger.error(f"Error in find_similar_items_by_text: {str(e)}")
         import traceback
         traceback.print_exc()
         return []
 
-def load_text_embeddings_from_firebase():
-    docs = db.collection("found_items").stream()
+def load_text_embeddings_from_firebase(collection="found_items"):
+    docs = db.collection(collection).stream()
     embeddings = []
 
     for doc in docs:
@@ -113,7 +116,7 @@ def load_text_embeddings_from_firebase():
         
         if description and "text_embedding" not in data:
             text_embedding = extract_text_features(description)
-            db.collection("found_items").document(doc.id).update({
+            db.collection(collection).document(doc.id).update({
                 "text_embedding": text_embedding.tolist() 
             })
             data["text_embedding"] = text_embedding.tolist() 

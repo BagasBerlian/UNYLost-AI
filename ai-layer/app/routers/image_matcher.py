@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Query, Body
 from typing import List, Optional
 from PIL import Image
 from io import BytesIO
@@ -348,3 +348,146 @@ async def add_item_images(
                     os.remove(file_path)
                     
         raise HTTPException(status_code=500, detail=f"Error adding images to item: {str(e)}")
+    
+@router.delete("/items/{item_id}/images")
+async def delete_item_image(item_id: str, image_url: str = Body(..., embed=True)):
+    try:
+        logger.info(f"Menghapus gambar dari item {item_id}: {image_url}")
+        
+        item = get_item_by_id(item_id, collection="found_items")
+        if not item:
+            raise HTTPException(status_code=404, detail=f"Item with ID {item_id} not found")
+        
+        additional_images = item.get("additional_images", [])
+        primary_image_url = item.get("image_url", "")
+        
+        if image_url == primary_image_url:
+            if additional_images:
+                new_primary = additional_images[0]
+                additional_images.remove(new_primary)
+                
+                db.collection("found_items").document(item_id).update({
+                    "image_url": new_primary,
+                    "additional_images": additional_images,
+                    "updated_at": datetime.now().isoformat()
+                })
+                
+                logger.info(f"Gambar utama dihapus, diganti dengan {new_primary}")
+                return {
+                    "success": True,
+                    "message": "Primary image deleted and replaced",
+                    "new_primary": new_primary,
+                    "remaining_images": additional_images
+                }
+            else:
+                db.collection("found_items").document(item_id).update({
+                    "image_url": "",
+                    "updated_at": datetime.now().isoformat()
+                })
+                
+                logger.info("Gambar utama dihapus, tidak ada gambar pengganti")
+                return {
+                    "success": True,
+                    "message": "Primary image deleted, no replacement available",
+                    "remaining_images": []
+                }
+        elif image_url in additional_images:
+            additional_images.remove(image_url)
+            
+            db.collection("found_items").document(item_id).update({
+                "additional_images": additional_images,
+                "updated_at": datetime.now().isoformat()
+            })
+            
+            logger.info(f"Gambar tambahan dihapus: {image_url}")
+            return {
+                "success": True,
+                "message": "Additional image deleted successfully",
+                "remaining_images": additional_images,
+                "primary_image": primary_image_url
+            }
+        else:
+            logger.warning(f"Gambar tidak ditemukan: {image_url}")
+            raise HTTPException(status_code=404, detail="Image not found in item images")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting item image: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error deleting item image: {str(e)}")
+    
+@router.delete("/items/{item_id}")
+async def delete_item(item_id: str):
+    try:
+        logger.info(f"Menghapus item dengan ID: {item_id}")
+        
+        item = get_item_by_id(item_id, collection="found_items")
+        if not item:
+            raise HTTPException(status_code=404, detail=f"Item with ID {item_id} not found")
+        
+        db.collection("found_items").document(item_id).delete()
+        
+        logger.info(f"Item {item_id} berhasil dihapus dari Firestore")
+        return {
+            "success": True,
+            "message": f"Item with ID {item_id} successfully deleted",
+            "item_id": item_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting item: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error deleting item: {str(e)}")
+    
+@router.put("/items/{item_id}/primary-image")
+async def set_primary_image(item_id: str, image_url: str = Body(..., embed=True)):
+    try:
+        logger.info(f"Mengatur gambar utama untuk item {item_id}: {image_url}")
+        
+        item = get_item_by_id(item_id, collection="found_items")
+        if not item:
+            raise HTTPException(status_code=404, detail=f"Item with ID {item_id} not found")
+        
+        additional_images = item.get("additional_images", [])
+        current_primary = item.get("image_url", "")
+        
+        if image_url == current_primary:
+            return {
+                "success": True,
+                "message": "Image is already the primary image",
+                "image_url": image_url
+            }
+        
+        update_data = {}
+        
+        if image_url in additional_images:
+            additional_images.remove(image_url)
+            update_data["additional_images"] = additional_images
+            
+            if current_primary and current_primary not in additional_images:
+                additional_images.append(current_primary)
+                update_data["additional_images"] = additional_images
+        
+        update_data["image_url"] = image_url
+        update_data["updated_at"] = datetime.now().isoformat()
+        
+        db.collection("found_items").document(item_id).update(update_data)
+        
+        logger.info(f"Gambar utama berhasil diubah untuk item {item_id}")
+        return {
+            "success": True,
+            "message": "Primary image successfully updated",
+            "previous_primary": current_primary,
+            "new_primary": image_url,
+            "additional_images": update_data.get("additional_images", additional_images)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting primary image: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error setting primary image: {str(e)}")

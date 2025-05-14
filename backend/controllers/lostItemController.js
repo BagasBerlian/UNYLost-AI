@@ -1,5 +1,7 @@
 const LostItem = require("../models/LostItem");
 const Category = require("../models/Category");
+const FoundItem = require("../models/FoundItem");
+const FoundItemImage = require("../models/FoundItemImage");
 const { validationResult } = require("express-validator");
 const axios = require("axios");
 const fs = require("fs");
@@ -473,6 +475,111 @@ exports.findPotentialMatches = async (req, res) => {
       `Error finding matches for lost item ${req.params.id}:`,
       error
     );
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.findMatchingItems = async (req, res) => {
+  try {
+    const { description } = req.body;
+    const file = req.file;
+
+    if (!description && !file) {
+      return res
+        .status(400)
+        .json({ message: "Either description or image file is required" });
+    }
+
+    console.log(`Mencari barang temuan yang cocok dengan barang hilang...`);
+    console.log(`Deskripsi: ${description || "tidak ada"}`);
+    console.log(`File gambar: ${file ? file.originalname : "tidak ada"}`);
+
+    let matches = [];
+
+    try {
+      if (file) {
+        const form = new FormData();
+
+        if (description) {
+          form.append("query", description);
+        }
+
+        const fileStream = fs.createReadStream(file.path);
+        form.append("file", fileStream, {
+          filename: file.originalname || "image.jpg",
+          contentType: file.mimetype || "image/jpeg",
+        });
+
+        const response = await axios.post(
+          `${aiLayerBaseUrl}/hybrid-matcher/match`,
+          form,
+          {
+            headers: { ...form.getHeaders() },
+            params: {
+              collection: "found_items",
+            },
+          }
+        );
+
+        matches = response.data.matches || [];
+        console.log(`Ditemukan ${matches.length} kecocokan hybrid`);
+      } else if (description) {
+        const response = await axios.get(
+          `${aiLayerBaseUrl}/text-matcher/search`,
+          {
+            params: {
+              q: description,
+              threshold: 0.2,
+              collection: "found_items",
+            },
+          }
+        );
+        matches = response.data.matches || [];
+        console.log(`Ditemukan ${matches.length} kecocokan teks`);
+      }
+    } catch (aiError) {
+      console.error("Error berkomunikasi dengan AI layer:", aiError.message);
+
+      if (aiError.response) {
+        console.error("Status error:", aiError.response.status);
+        console.error("Data error:", aiError.response.data);
+      }
+
+      return res.status(500).json({
+        message: "Error finding matching items",
+        details: aiError.message,
+      });
+    } finally {
+      if (file && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+    }
+
+    const matchedItems = [];
+    for (const match of matches) {
+      if (match.id) {
+        const item = await FoundItem.getByFirestoreId(match.id);
+        if (item) {
+          const images = await FoundItemImage.getByItemId(item.id);
+
+          matchedItems.push({
+            ...item,
+            images,
+            match_score: match.score,
+            match_type: match.match_type,
+          });
+        }
+      }
+    }
+
+    res.status(200).json({
+      message: "Found items that match your lost item",
+      direction: "lost → found",
+      matches: matchedItems,
+      total_matches: matchedItems.length,
+    });
+  } catch (error) {
+    console.error("Error finding matching items:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

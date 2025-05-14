@@ -78,7 +78,7 @@ router.get(
 
 router.post(
   "/find-matches",
-  authMiddleware,
+  [authMiddleware, upload.single("image")],
   foundItemController.findMatchingItems
 );
 

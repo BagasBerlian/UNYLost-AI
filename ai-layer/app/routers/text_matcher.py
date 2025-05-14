@@ -48,11 +48,18 @@ async def match_text(
 async def search_text(
     q: str = Query(..., description="Query text to search for"),
     threshold: float = Query(0.2, description="Minimum similarity threshold"),
-    max_results: int = Query(10, description="Maximum number of results to return")
+    max_results: int = Query(10, description="Maximum number of results to return"),
+    collection: str = Query("found_items", description="Collection to search in")
 ):
     try:
         if not q:
             raise HTTPException(status_code=400, detail="Query text is required")
+            
+        if collection not in ["found_items", "lost_items"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Collection must be either 'found_items' or 'lost_items'"
+            )
             
         if threshold < 0 or threshold > 1:
             raise HTTPException(status_code=400, detail="Threshold must be between 0 and 1")
@@ -60,12 +67,13 @@ async def search_text(
         if max_results < 1:
             raise HTTPException(status_code=400, detail="Max results must be at least 1")
             
-        matches = find_similar_items_by_text(q, threshold=threshold)
+        matches = find_similar_items_by_text(q, threshold=threshold, collection=collection)
         
         matches = matches[:max_results]
         
         return {
             "query": q,
+            "collection": collection,
             "matches": matches,
             "total_matches": len(matches)
         }

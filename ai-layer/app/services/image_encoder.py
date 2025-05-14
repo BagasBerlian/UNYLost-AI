@@ -87,9 +87,9 @@ def extract_features_from_url(url: str):
         logger.error(f"Error extracting features from URL {url}: {str(e)}")
         raise
 
-def load_embeddings_from_firebase():
+def load_embeddings_from_firebase(collection="found_items"):
     try:
-        docs = db.collection("found_items").stream()
+        docs = db.collection(collection).stream()
         embeddings = []
 
         for doc in docs:
@@ -114,15 +114,15 @@ def load_embeddings_from_firebase():
                 
                 embeddings.append(item_data)
 
-        logger.info(f"Loaded {len(embeddings)} embeddings from Firebase")
+        logger.info(f"Loaded {len(embeddings)} embeddings from Firebase collection: {collection}")
         return embeddings
     except Exception as e:
         logger.error(f"Error loading embeddings from Firebase: {str(e)}")
         return []
 
-def find_similar_items(new_embedding, threshold=0.3):
+def find_similar_items(new_embedding, threshold=0.3, collection="found_items"):
     try:
-        found_data = load_embeddings_from_firebase()
+        found_data = load_embeddings_from_firebase(collection=collection)
         similarities = []
 
         for item in found_data:

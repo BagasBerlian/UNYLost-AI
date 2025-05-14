@@ -28,14 +28,18 @@ GET /api/found-items/user/:userId - Dapatkan barang temuan berdasarkan user ID (
 
 ## Manajemen Gambar
 POST /api/found-items/:id/images - Tambahkan gambar ke barang temuan ✅
-DELETE /api/found-items/:id/images/:imageId - Hapus gambar dari barang temuan
-PUT /api/found-items/:id/images/:imageId/primary - Set gambar sebagai primary
+DELETE /api/found-items/:id/images/:imageId - Hapus gambar dari barang temuan ✅
+PUT /api/found-items/:id/images/:imageId/primary - Set gambar sebagai primary ✅
 
 ## AI Integration
-POST /api/found-items/find-matches - Cari barang yang cocok menggunakan AI
+POST /api/found-items/find-matches - Cari barang yang cocok menggunakan AI 
+  => "Saya menemukan sesuatu, apakah ada yang kehilangan barang ini?"
+POST /api/lost-items/find-matches - Dapatkan barang temuan yang mungkin cocok ✅
+  => "Saya kehilangan sesuatu, apakah ada yang menemukan barang ini?" 
 
 ## Status
 PUT /api/found-items/:id/status - Update status barang temuan (admin only)
+PUT /api/lost-items/:id/status - Update status barang hilang
 
 # Lost Items API
 
@@ -46,22 +50,13 @@ POST /api/lost-items - Laporkan barang hilang baru ✅
 PUT /api/lost-items/:id - Update barang hilang ✅
 DELETE /api/lost-items/:id - Delete barang hilang (Hanya pemilik dan admin) ✅
 
+catatan : ketika menambahkan lost item , image_url masih null
+
 ## Filter & Pencarian
 GET /api/lost-items/search?q=keyword - Cari barang hilang berdasarkan kata kunci
 GET /api/lost-items/category/:categoryId - Dapatkan barang hilang berdasarkan kategori
 GET /api/lost-items/my-items - Dapatkan barang hilang milik user yang login
 GET /api/lost-items/user/:userId - Dapatkan barang hilang berdasarkan user ID (admin only)
-
-## Manajemen Gambar
-POST /api/lost-items/:id/images - Tambahkan gambar ke barang hilang
-DELETE /api/lost-items/:id/images/:imageId - Hapus gambar dari barang hilang
-PUT /api/lost-items/:id/images/:imageId/primary - Set gambar sebagai primary
-
-## AI Integration
-GET /api/lost-items/:id/matches - Dapatkan barang temuan yang mungkin cocok
-
-## Status
-PUT /api/lost-items/:id/status - Update status barang hilang
 
 # Claims API
 
@@ -90,9 +85,9 @@ catatan : ketika menambahkan nama categori yang sama seharusnya tidak bisa (name
 # Authentication API
 
 ## Dasar
-POST /api/auth/register - Daftar user baru
-POST /api/auth/login - Login user
-GET /api/auth/verify/:token - Verifikasi email
+POST /api/auth/register - Daftar user baru ✅
+POST /api/auth/login - Login user ✅
+GET /api/auth/verify/:token - Verifikasi email ✅
 POST /api/auth/forgot-password - Request reset password
 POST /api/auth/reset-password/:token - Reset password
 

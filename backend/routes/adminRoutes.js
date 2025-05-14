@@ -19,5 +19,10 @@ router.put(
   adminController.updateUserRole
 );
 router.get("/dashboard", adminController.getDashboardStats);
+router.post(
+  "/sync-lost-items",
+  [authMiddleware, adminMiddleware],
+  adminController.syncLostItemsToFirestore
+);
 
 module.exports = router;

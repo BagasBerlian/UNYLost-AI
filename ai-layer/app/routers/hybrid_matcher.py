@@ -5,6 +5,9 @@ from io import BytesIO
 from typing import Optional
 import json
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/hybrid-matcher", tags=["Hybrid Matching"])
 
@@ -16,13 +19,20 @@ async def hybrid_match(
     text_threshold: float = Form(0.2),
     image_weight: float = Form(0.4), 
     text_weight: float = Form(0.6),
-    max_results: int = Form(10)
+    max_results: int = Form(10),
+    collection: str = Form("found_items")  
 ):
     try:
         if not file and not query:
             raise HTTPException(
                 status_code=400, 
                 detail="At least one of file or query text must be provided"
+            )
+            
+        if collection not in ["found_items", "lost_items"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Collection must be either 'found_items' or 'lost_items'"
             )
             
         if image_threshold < 0 or image_threshold > 1:
@@ -49,7 +59,8 @@ async def hybrid_match(
             text_threshold=text_threshold,
             image_weight=image_weight,
             text_weight=text_weight,
-            max_results=max_results
+            max_results=max_results,
+            collection=collection
         )
         
         for match in matches:
@@ -61,6 +72,7 @@ async def hybrid_match(
         return {
             "image_provided": file is not None,
             "text_provided": query is not None,
+            "collection": collection,  
             "matches": matches,
             "total_matches": len(matches),
             "parameters": {
@@ -74,6 +86,10 @@ async def hybrid_match(
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
+        # Tambahkan traceback untuk debugging
+        import traceback
+        logger.error(f"Error in hybrid matching: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error in hybrid matching: {str(e)}")
 
 @router.get("/search")

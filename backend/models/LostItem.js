@@ -232,6 +232,28 @@ class LostItem {
       });
     });
   }
+
+  static getByFirestoreId(firestoreId) {
+    return new Promise((resolve, reject) => {
+      db.query(
+        `SELECT l.*, c.name as category_name, u.full_name as owner_name 
+       FROM lost_items l 
+       JOIN categories c ON l.category_id = c.id 
+       JOIN users u ON l.user_id = u.id 
+       WHERE l.firestore_id = ?`,
+        [firestoreId],
+        (error, results) => {
+          if (error) {
+            return reject(error);
+          }
+          if (results.length === 0) {
+            return resolve(null);
+          }
+          resolve(results[0]);
+        }
+      );
+    });
+  }
 }
 
 module.exports = LostItem;
