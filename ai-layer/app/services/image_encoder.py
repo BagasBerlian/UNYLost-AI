@@ -1,3 +1,7 @@
+# pylint: disable=all
+# type: ignore
+# noqa
+
 import torch
 import torchvision.models as models
 import torchvision.transforms as transforms

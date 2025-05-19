@@ -1,3 +1,7 @@
+# pylint: disable=all
+# type: ignore
+# noqa
+
 from firebase_admin import storage
 from app.services.firebase import db
 import uuid

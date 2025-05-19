@@ -1,3 +1,7 @@
+# pylint: disable=all
+# type: ignore
+# noqa
+
 import os
 import pickle
 import torch

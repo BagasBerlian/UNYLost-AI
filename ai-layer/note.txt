@@ -7,7 +7,9 @@ Buat app/main.py
 Buat Endpoint Dasar: app/routers/image_matcher.py
 python generate_embeddings.py
 
-
+# pylint: disable=all
+# type: ignore
+# noqa
 
 Menyiapkan firebase:
 1. Kunjungi: https://console.firebase.google.com

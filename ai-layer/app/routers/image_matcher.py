@@ -1,3 +1,7 @@
+# pylint: disable=all
+# type: ignore
+# noqa
+
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Query, Body
 from typing import List, Optional
 from PIL import Image

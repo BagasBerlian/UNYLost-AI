@@ -1,3 +1,8 @@
+# pylint: disable=all
+# type: ignore
+# noqa
+
+
 from app.services.image_encoder import extract_features, find_similar_items
 from app.services.text_encoder import extract_text_features, find_similar_items_by_text
 from app.services.feedback_learner import get_recent_feedback

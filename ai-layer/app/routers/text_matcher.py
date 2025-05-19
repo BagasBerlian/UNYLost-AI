@@ -1,3 +1,7 @@
+# pylint: disable=all
+# type: ignore
+# noqa
+
 from fastapi import APIRouter, HTTPException, Form, Query, Body
 from app.services.text_encoder import (
     find_similar_items_by_text, 

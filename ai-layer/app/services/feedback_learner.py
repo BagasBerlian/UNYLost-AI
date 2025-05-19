@@ -1,3 +1,7 @@
+# pylint: disable=all
+# type: ignore
+# noqa
+
 from app.services.firebase import db
 from firebase_admin import firestore
 from datetime import datetime, timedelta

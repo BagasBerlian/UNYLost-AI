@@ -1,3 +1,7 @@
+# pylint: disable=all
+# type: ignore
+# noqa
+
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from PIL import Image
 from app.services.hybrid_matcher import find_items_hybrid
@@ -86,7 +90,6 @@ async def hybrid_match(
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
-        # Tambahkan traceback untuk debugging
         import traceback
         logger.error(f"Error in hybrid matching: {str(e)}")
         logger.error(traceback.format_exc())

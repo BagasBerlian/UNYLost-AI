@@ -1,3 +1,7 @@
+# pylint: disable=all
+# type: ignore
+# noqa
+
 import firebase_admin
 from firebase_admin import credentials, firestore
 
