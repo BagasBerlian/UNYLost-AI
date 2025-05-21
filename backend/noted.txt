@@ -46,8 +46,8 @@ PUT /api/lost-items/:id/status - Update status barang hilang
 ## Dasar
 GET /api/lost-items - Dapatkan semua barang hilang (admin only) ✅
 GET /api/lost-items/:id - Dapatkan barang hilang berdasarkan ID (admin only) ✅
-POST /api/lost-items - Laporkan barang hilang baru ✅
-PUT /api/lost-items/:id - Update barang hilang ✅
+POST /api/lost-items - Laporkan barang hilang baru 
+PUT /api/lost-items/:id - Update barang hilang 
 DELETE /api/lost-items/:id - Delete barang hilang (Hanya pemilik dan admin) ✅
 
 catatan : ketika menambahkan lost item , image_url masih null
@@ -104,3 +104,7 @@ PUT /api/users/password - Ganti password
 GET /api/admin/dashboard - Dapatkan data dashboard (admin only)
 GET /api/admin/users - Dapatkan daftar user (admin only) ✅
 PUT /api/admin/users/:userId/role - Update role user (admin only)
+GET /api/admin/sync-status` - Mendapatkan status sinkronisasi data
+POST /api/admin/sync-lost-items` - Memulai sinkronisasi manual barang hilang
+GET /api/admin/firestore-collections` - Melihat koleksi Firebase yang ada
+POST /api/admin/firestore-collections` - Membuat koleksi Firebase baru

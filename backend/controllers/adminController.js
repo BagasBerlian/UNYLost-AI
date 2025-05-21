@@ -1,4 +1,5 @@
 const db = require("../config/database");
+const syncService = require("../services/syncService");
 
 exports.getAllUsers = async (req, res) => {
   try {
@@ -283,105 +284,80 @@ exports.getDashboardStats = async (req, res) => {
 
 exports.syncLostItemsToFirestore = async (req, res) => {
   try {
+    const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+
+    const result = await syncService.syncLostItemsToFirestore(limit);
+
+    res.status(200).json({
+      message: `Sync completed: ${result.synchronized} success, ${result.failed} failed`,
+      results: result,
+    });
+  } catch (error) {
+    console.error("Error syncing lost items to Firestore:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getSyncStatus = async (req, res) => {
+  try {
     const db = require("../config/database");
 
     db.query(
-      `SELECT l.*, c.name as category_name 
-       FROM lost_items l 
-       JOIN categories c ON l.category_id = c.id 
-       WHERE l.firestore_id IS NULL`,
-      async (error, results) => {
+      `SELECT 
+        (SELECT COUNT(*) FROM lost_items WHERE firestore_id IS NOT NULL) as synced_items,
+        (SELECT COUNT(*) FROM lost_items WHERE firestore_id IS NULL) as unsynced_items,
+        (SELECT COUNT(*) FROM lost_items WHERE needs_sync = TRUE) as items_needing_sync,
+        (SELECT MAX(last_sync_attempt) FROM lost_items) as last_sync_attempt
+      `,
+      (error, results) => {
         if (error) {
-          console.error("Error getting lost items:", error);
+          console.error("Database error:", error);
           return res.status(500).json({ message: "Server error" });
         }
 
-        console.log(
-          `Ditemukan ${results.length} item yang belum memiliki firestore_id`
-        );
-
-        const syncResults = {
-          total: results.length,
-          success: 0,
-          failed: 0,
-          details: [],
-        };
-
-        for (const item of results) {
-          try {
-            const aiResponse = await axios.post(
-              `${aiLayerBaseUrl}/lost-items/add-text`,
-              {
-                item_name: item.item_name,
-                description: item.description || "",
-                last_seen_location: item.last_seen_location || "",
-                category: item.category_name,
-                date_lost: item.lost_date
-                  ? new Date(item.lost_date).toISOString().split("T")[0]
-                  : "",
-                owner_id: item.user_id.toString(),
-                reward: item.reward || "",
-                image_url: item.image_url || "",
-              }
-            );
-
-            if (aiResponse.data && aiResponse.data.item_id) {
-              const firestoreId = aiResponse.data.item_id;
-
-              await new Promise((resolve, reject) => {
-                db.query(
-                  "UPDATE lost_items SET firestore_id = ? WHERE id = ?",
-                  [firestoreId, item.id],
-                  (updateError) => {
-                    if (updateError) {
-                      console.error(
-                        `Error updating item ${item.id}:`,
-                        updateError
-                      );
-                      reject(updateError);
-                    } else {
-                      resolve();
-                    }
-                  }
-                );
-              });
-
-              syncResults.success++;
-              syncResults.details.push({
-                id: item.id,
-                item_name: item.item_name,
-                firestore_id: firestoreId,
-                status: "success",
-              });
-            } else {
-              syncResults.failed++;
-              syncResults.details.push({
-                id: item.id,
-                item_name: item.item_name,
-                status: "failed",
-                reason: "No firestore_id returned",
-              });
-            }
-          } catch (itemError) {
-            console.error(`Error syncing item ${item.id}:`, itemError);
-            syncResults.failed++;
-            syncResults.details.push({
-              id: item.id,
-              item_name: item.item_name,
-              status: "failed",
-              reason: itemError.message,
-            });
-          }
-        }
-
         res.status(200).json({
-          message: `Sync completed: ${syncResults.success} success, ${syncResults.failed} failed`,
-          results: syncResults,
+          sync_status: results[0],
         });
       }
     );
   } catch (error) {
-    console.error("Error syncing lost items to Firestore:", error);
+    console.error("Error getting sync status:", error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.checkFirestoreCollections = async (req, res) => {
+  try {
+    const aiResponse = await axios.get(`${aiLayerBaseUrl}/admin/collections`);
+
+    res.status(200).json({
+      collections: aiResponse.data.collections,
+      message: "Firestore collections retrieved successfully",
+    });
+  } catch (error) {
+    console.error("Error checking Firestore collections:", error);
+    res.status(500).json({ message: "Error checking Firestore collections" });
+  }
+};
+
+exports.createFirestoreCollection = async (req, res) => {
+  try {
+    const { collection } = req.body;
+
+    if (!collection) {
+      return res.status(400).json({ message: "Collection name is required" });
+    }
+
+    const aiResponse = await axios.post(`${aiLayerBaseUrl}/admin/collections`, {
+      collection,
+    });
+
+    res.status(200).json({
+      message: `Collection ${collection} created successfully`,
+      details: aiResponse.data,
+    });
+  } catch (error) {
+    console.error("Error creating Firestore collection:", error);
+    res.status(500).json({ message: "Error creating Firestore collection" });
   }
 };

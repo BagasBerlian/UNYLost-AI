@@ -7,9 +7,20 @@ const categoryRoutes = require("./routes/categories");
 const foundItemRoutes = require("./routes/foundItems");
 const lostItemRoutes = require("./routes/lostItems");
 const claimRoutes = require("./routes/claims");
+const scheduledTasks = require("./services/scheduledTasks");
 const db = require("./config/database");
 
 const app = express();
+// scheduledTasks.startSyncJobs();
+
+// try {
+//   const LostItem = require("./models/LostItem");
+//   LostItem.addSyncFields()
+//     .then(() => console.log("Lost Item sync fields initialized"))
+//     .catch((err) => console.error("Error initializing sync fields:", err));
+// } catch (error) {
+//   console.error("Error during model initialization:", error);
+// }
 
 app.use(cors());
 app.use(express.json());

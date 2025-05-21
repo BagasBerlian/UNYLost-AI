@@ -51,61 +51,106 @@ exports.createLostItem = async (req, res) => {
     }
 
     const newItem = await LostItem.create(itemData);
+    const itemId = newItem.id;
 
-    let matches = [];
-    if (req.file && (description || item_name)) {
+    const firebaseData = {
+      item_name,
+      description: description || "",
+      last_seen_location,
+      category: category.name,
+      date_lost: lost_date,
+      owner_id: userId.toString(),
+      reward: reward || "",
+      status: "active",
+      mysql_id: itemId.toString(),
+    };
+
+    if (req.file) {
+      const form = new FormData();
+      Object.keys(firebaseData).forEach((key) => {
+        form.append(key, firebaseData[key]);
+      });
+
+      const fileStream = fs.createReadStream(req.file.path);
+      form.append("file", fileStream, {
+        filename: req.file.originalname || "image.jpg",
+        contentType: req.file.mimetype || "image/jpeg",
+      });
+
       try {
-        const form = new FormData();
-        const queryText = description || item_name;
-        form.append("query", queryText);
-
-        const fileStream = fs.createReadStream(req.file.path);
-        form.append("file", fileStream, {
-          filename: req.file.originalname || "image.jpg",
-          contentType: req.file.mimetype || "image/jpeg",
-        });
-
-        console.log("Sending hybrid matching request to AI Layer...");
-        const matchResponse = await axios.post(
-          `${aiLayerBaseUrl}/hybrid-matcher/match`,
+        const aiResponse = await axios.post(
+          `${aiLayerBaseUrl}/lost-items/add`,
           form,
-          { headers: { ...form.getHeaders() } }
+          {
+            headers: {
+              ...form.getHeaders(),
+            },
+          }
         );
 
-        console.log("Hybrid matching results:", matchResponse.data);
-        matches = matchResponse.data.matches || [];
+        if (aiResponse.data && aiResponse.data.item_id) {
+          await LostItem.update(itemId, {
+            firestore_id: aiResponse.data.item_id,
+            image_url: aiResponse.data.image_url || itemData.image_url,
+          });
+
+          const matches = aiResponse.data.matches || [];
+
+          res.status(201).json({
+            message: "Lost item created successfully",
+            item: { ...newItem, firestore_id: aiResponse.data.item_id },
+            image_url: aiResponse.data.image_url || itemData.image_url,
+            potential_matches: matches,
+          });
+        } else {
+          throw new Error("No item_id returned from AI Layer");
+        }
       } catch (aiError) {
-        console.error("Error communicating with AI Layer:", aiError.message);
-        console.log(
-          "Error details:",
-          aiError.response?.data || "No detailed error info"
-        );
+        console.error("Error communicating with AI layer:", aiError);
+        await LostItem.update(itemId, { needs_sync: true });
+        res.status(201).json({
+          message: "Lost item created successfully, but AI processing failed",
+          item: newItem,
+          image_url: itemData.image_url,
+          warning:
+            "Item not synced with AI system, matching functionality limited",
+        });
       }
-    } else if (description) {
+    } else {
       try {
-        console.log("Sending text matching request to AI Layer...");
-        const matchResponse = await axios.get(
-          `${aiLayerBaseUrl}/text-matcher/search`,
-          { params: { q: description, threshold: 0.2 } }
+        const aiResponse = await axios.post(
+          `${aiLayerBaseUrl}/lost-items/add-text`,
+          firebaseData
         );
 
-        console.log("Text matching results:", matchResponse.data);
-        matches = matchResponse.data.matches || [];
-      } catch (error) {
-        console.error("Error in text matching:", error.message);
-        console.log(
-          "Error details:",
-          error.response?.data || "No detailed error info"
-        );
+        if (aiResponse.data && aiResponse.data.item_id) {
+          await LostItem.update(itemId, {
+            firestore_id: aiResponse.data.item_id,
+          });
+
+          const matches = aiResponse.data.matches || [];
+
+          res.status(201).json({
+            message: "Lost item created successfully",
+            item: { ...newItem, firestore_id: aiResponse.data.item_id },
+            potential_matches: matches,
+          });
+        } else {
+          throw new Error("No item_id returned from AI Layer");
+        }
+      } catch (aiError) {
+        console.error("Error communicating with AI layer:", aiError);
+
+        await LostItem.update(itemId, { needs_sync: true });
+
+        res.status(201).json({
+          message: "Lost item created successfully, but AI processing failed",
+          item: newItem,
+          warning:
+            "Item not synced with AI system, matching functionality limited",
+        });
       }
     }
-
-    res.status(201).json({
-      message: "Lost item created successfully",
-      item: newItem,
-      image_url: itemData.image_url || null,
-      potential_matches: matches.length > 0 ? matches : [],
-    });
   } catch (error) {
     console.error("Error creating lost item:", error);
     if (req.file && fs.existsSync(req.file.path)) {

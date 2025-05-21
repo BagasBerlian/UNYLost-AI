@@ -22,6 +22,7 @@ ai-layer/temp_images/*.png
 ai-layer/temp_images/*.jpeg
 ai-layer/embeddings/*.npy
 ai-layer/embeddings/*.pkl
+ai-layer/stopwordbahasa.csv
 
 # Backend - Node.js
 backend/node_modules/

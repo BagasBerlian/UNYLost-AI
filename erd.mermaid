@@ -1,0 +1,113 @@
+erDiagram
+    USERS {
+        int id PK
+        string full_name
+        string email
+        string password
+        string phone_number
+        enum role
+        boolean is_verified
+        string verification_token
+        string reset_password_token
+        datetime reset_password_expires
+        datetime last_login
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    CATEGORIES {
+        int id PK
+        string name
+        string description
+        string icon
+        int priority
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    FOUND_ITEMS {
+        int id PK
+        int user_id FK
+        string firestore_id
+        string item_name
+        int category_id FK
+        string description
+        string location
+        date found_date
+        string image_url
+        enum status
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    FOUND_ITEM_IMAGES {
+        int id PK
+        int found_item_id FK
+        string image_url
+        boolean is_primary
+        timestamp created_at
+    }
+    
+    LOST_ITEMS {
+        int id PK
+        int user_id FK
+        string firestore_id
+        string item_name
+        int category_id FK
+        string description
+        string last_seen_location
+        date lost_date
+        string image_url
+        enum status
+        string reward
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    ITEM_CLAIMS {
+        int id PK
+        int user_id FK
+        int item_id FK
+        text description
+        string lost_location
+        date lost_date
+        text additional_proof
+        enum status
+        text admin_notes
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    NOTIFICATIONS {
+        int id PK
+        int user_id FK
+        string title
+        text message
+        string type
+        int reference_id
+        string reference_type
+        boolean is_read
+        timestamp created_at
+    }
+    
+    FEEDBACK {
+        int id PK
+        int user_id FK
+        int item_id FK
+        int rating
+        text comment
+        timestamp created_at
+    }
+    
+    USERS ||--o{ FOUND_ITEMS : "reports"
+    USERS ||--o{ LOST_ITEMS : "reports"
+    USERS ||--o{ ITEM_CLAIMS : "submits"
+    USERS ||--o{ NOTIFICATIONS : "receives"
+    USERS ||--o{ FEEDBACK : "gives"
+    
+    CATEGORIES ||--o{ FOUND_ITEMS : "categorizes"
+    CATEGORIES ||--o{ LOST_ITEMS : "categorizes"
+    
+    FOUND_ITEMS ||--o{ FOUND_ITEM_IMAGES : "has"
+    FOUND_ITEMS ||--o{ ITEM_CLAIMS : "has"
+    FOUND_ITEMS ||--o{ FEEDBACK : "receives"
