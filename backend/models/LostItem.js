@@ -255,37 +255,38 @@ class LostItem {
     });
   }
 
-  // static addSyncFields() {
-  //   return new Promise((resolve, reject) => {
-  //     db.query(
-  //       "ALTER TABLE lost_items ADD COLUMN IF NOT EXISTS needs_sync BOOLEAN DEFAULT FALSE",
-  //       (error) => {
-  //         if (error) {
-  //           return reject(error);
-  //         }
+  static addSyncFields() {
+    console.log("Executing LostItem.addSyncFields...");
+    return new Promise((resolve, reject) => {
+      db.query(
+        "ALTER TABLE lost_items ADD COLUMN IF NOT EXISTS needs_sync BOOLEAN DEFAULT FALSE",
+        (error) => {
+          if (error) {
+            return reject(error);
+          }
 
-  //         db.query(
-  //           "ALTER TABLE lost_items ADD COLUMN IF NOT EXISTS last_sync_attempt DATETIME",
-  //           (error) => {
-  //             if (error) {
-  //               return reject(error);
-  //             }
+          db.query(
+            "ALTER TABLE lost_items ADD COLUMN IF NOT EXISTS last_sync_attempt DATETIME",
+            (error) => {
+              if (error) {
+                return reject(error);
+              }
 
-  //             db.query(
-  //               "ALTER TABLE lost_items ADD COLUMN IF NOT EXISTS sync_error TEXT",
-  //               (error) => {
-  //                 if (error) {
-  //                   return reject(error);
-  //                 }
-  //                 resolve(true);
-  //               }
-  //             );
-  //           }
-  //         );
-  //       }
-  //     );
-  //   });
-  // }
+              db.query(
+                "ALTER TABLE lost_items ADD COLUMN IF NOT EXISTS sync_error TEXT",
+                (error) => {
+                  if (error) {
+                    return reject(error);
+                  }
+                  resolve(true);
+                }
+              );
+            }
+          );
+        }
+      );
+    });
+  }
 
   static getItemsNeedingSync(limit = 50) {
     return new Promise((resolve, reject) => {

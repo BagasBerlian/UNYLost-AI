@@ -11,16 +11,16 @@ const scheduledTasks = require("./services/scheduledTasks");
 const db = require("./config/database");
 
 const app = express();
-scheduledTasks.startSyncJobs();
+// scheduledTasks.startSyncJobs();
 
-try {
-  const LostItem = require("./models/LostItem");
-  LostItem.addSyncFields()
-    .then(() => console.log("Lost Item sync fields initialized"))
-    .catch((err) => console.error("Error initializing sync fields:", err));
-} catch (error) {
-  console.error("Error during model initialization:", error);
-}
+// try {
+//   const LostItem = require("./models/LostItem");
+//   LostItem.addSyncFields()
+//     .then(() => console.log("Lost Item sync fields initialized"))
+//     .catch((err) => console.error("Error initializing sync fields:", err));
+// } catch (error) {
+//   console.error("Error during model initialization:", error);
+// }
 
 app.use(cors());
 app.use(express.json());
