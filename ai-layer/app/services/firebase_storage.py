@@ -38,6 +38,12 @@ def save_found_item(item_data, image_url=None, image_embedding=None, text_embedd
 
 def save_lost_item(item_data, image_url=None, image_embedding=None, text_embedding=None):
     item_id = item_data.get("id", str(uuid.uuid4()))
+    collections = [coll.id for coll in db.collections()]
+    if 'lost_items' not in collections:
+        db.collection('lost_items').document('placeholder').set({
+            'created_at': datetime.now().isoformat(),
+            'placeholder': True
+        })
     
     data = {
         "item_name": item_data.get("item_name", ""),
@@ -47,9 +53,10 @@ def save_lost_item(item_data, image_url=None, image_embedding=None, text_embeddi
         "date_lost": item_data.get("date_lost", datetime.now().isoformat()),
         "owner_id": item_data.get("owner_id", ""),
         "owner_contact": item_data.get("owner_contact", ""),
-        "status": item_data.get("status", "pending"),
+        "status": item_data.get("status", "active"),
         "reward": item_data.get("reward", ""),
-        "updated_at": datetime.now().isoformat()
+        "updated_at": datetime.now().isoformat(),
+        "mysql_id": item_data.get("mysql_id", "")
     }
     
     if image_url:
@@ -66,7 +73,6 @@ def save_lost_item(item_data, image_url=None, image_embedding=None, text_embeddi
     return {"id": item_id, **data}
 
 def get_item_by_id(item_id, collection="found_items"):
-    # Mengambil item berdasarkan ID
     doc_ref = db.collection(collection).document(item_id)
     doc = doc_ref.get()
     
@@ -76,7 +82,6 @@ def get_item_by_id(item_id, collection="found_items"):
         return None
 
 def update_item_status(item_id, status, collection="found_items"):
-    # Memperbarui status item
     db.collection(collection).document(item_id).update({
         "status": status,
         "updated_at": datetime.now().isoformat()

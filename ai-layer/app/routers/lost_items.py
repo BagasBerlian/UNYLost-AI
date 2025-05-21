@@ -25,6 +25,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/lost-items", tags=["Lost Items"])
 
+def ensure_lost_items_collection():
+    try:
+        collections = [coll.id for coll in db.collections()]
+        if 'lost_items' not in collections:
+            logger.info("Creating lost_items collection")
+            db.collection('lost_items').document('placeholder').set({
+                'created_at': datetime.now().isoformat(),
+                'placeholder': True
+            })
+            logger.info("lost_items collection created successfully")
+    except Exception as e:
+        logger.error(f"Error ensuring lost_items collection: {str(e)}")
+
 @router.post("/add")
 async def add_lost_item(
     item_name: str = Form(...),
@@ -35,10 +48,13 @@ async def add_lost_item(
     file: UploadFile = File(...),
     owner_id: Optional[str] = Form(None),
     owner_contact: Optional[str] = Form(None),
-    reward: Optional[str] = Form(None)
+    reward: Optional[str] = Form(None),
+    mysql_id: Optional[str] = Form(None)
 ):
     try:
         logger.info(f"Menambahkan lost item: {item_name}")
+        
+        ensure_lost_items_collection()
         
         file_content = await file.read()
         image = Image.open(BytesIO(file_content)).convert("RGB")
@@ -74,6 +90,9 @@ async def add_lost_item(
             
         if reward:
             item_data["reward"] = reward
+        
+        if mysql_id:
+            item_data["mysql_id"] = mysql_id
         
         result = save_lost_item(item_data, image_url, embedding, text_embedding)
         

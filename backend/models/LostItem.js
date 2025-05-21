@@ -254,6 +254,95 @@ class LostItem {
       );
     });
   }
+
+  // static addSyncFields() {
+  //   return new Promise((resolve, reject) => {
+  //     db.query(
+  //       "ALTER TABLE lost_items ADD COLUMN IF NOT EXISTS needs_sync BOOLEAN DEFAULT FALSE",
+  //       (error) => {
+  //         if (error) {
+  //           return reject(error);
+  //         }
+
+  //         db.query(
+  //           "ALTER TABLE lost_items ADD COLUMN IF NOT EXISTS last_sync_attempt DATETIME",
+  //           (error) => {
+  //             if (error) {
+  //               return reject(error);
+  //             }
+
+  //             db.query(
+  //               "ALTER TABLE lost_items ADD COLUMN IF NOT EXISTS sync_error TEXT",
+  //               (error) => {
+  //                 if (error) {
+  //                   return reject(error);
+  //                 }
+  //                 resolve(true);
+  //               }
+  //             );
+  //           }
+  //         );
+  //       }
+  //     );
+  //   });
+  // }
+
+  static getItemsNeedingSync(limit = 50) {
+    return new Promise((resolve, reject) => {
+      db.query(
+        `SELECT l.*, c.name as category_name, u.full_name as owner_name 
+         FROM lost_items l 
+         JOIN categories c ON l.category_id = c.id 
+         JOIN users u ON l.user_id = u.id 
+         WHERE (l.needs_sync = TRUE OR l.firestore_id IS NULL)
+         ORDER BY l.created_at DESC 
+         LIMIT ?`,
+        [limit],
+        (error, results) => {
+          if (error) {
+            return reject(error);
+          }
+          resolve(results);
+        }
+      );
+    });
+  }
+
+  static markSynced(id, firestoreId) {
+    return new Promise((resolve, reject) => {
+      db.query(
+        "UPDATE lost_items SET needs_sync = FALSE, firestore_id = ?, last_sync_attempt = NOW(), sync_error = NULL WHERE id = ?",
+        [firestoreId, id],
+        (error, results) => {
+          if (error) {
+            return reject(error);
+          }
+          if (results.affectedRows === 0) {
+            return resolve(false);
+          }
+          resolve(true);
+        }
+      );
+    });
+  }
+
+  static markSyncFailed(id, errorMessage) {
+    return new Promise((resolve, reject) => {
+      db.query(
+        "UPDATE lost_items SET needs_sync = TRUE, last_sync_attempt = NOW(), sync_error = ? WHERE id = ?",
+        [errorMessage, id],
+        (error, results) => {
+          if (error) {
+            return reject(error);
+          }
+          if (results.affectedRows === 0) {
+            return resolve(false);
+          }
+          resolve(true);
+        }
+      );
+    });
+  }
 }
 
 module.exports = LostItem;
