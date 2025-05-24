@@ -18,7 +18,7 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [alamat, setAlamat] = useState("");
+  const [address, setAddress] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -27,8 +27,8 @@ export default function RegisterScreen() {
   const { register } = useContext(AuthContext);
 
   const handleRegister = async () => {
-    if (!fullName || !email || !password || !phoneNumber) {
-      setError("Semua kolom wajib diisi kecuali alamat");
+    if (!fullName || !email || !password || !phoneNumber || !address) {
+      setError("Semua kolom wajib diisi");
       return;
     }
 
@@ -41,6 +41,7 @@ export default function RegisterScreen() {
         email,
         password,
         phone_number: phoneNumber,
+        address: address,
       });
 
       if (!result.success) {
@@ -86,6 +87,7 @@ export default function RegisterScreen() {
               mode="outlined"
               placeholder="User"
               value={fullName}
+              textColor="#000"
               onChangeText={setFullName}
               outlineColor="#E0E0E0"
               activeOutlineColor="#1E88E5"
@@ -97,6 +99,7 @@ export default function RegisterScreen() {
               mode="outlined"
               placeholder="user@gmail.com"
               value={email}
+              textColor="#000"
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -104,12 +107,13 @@ export default function RegisterScreen() {
               activeOutlineColor="#1E88E5"
             />
 
-            <Text style={styles.label}>Set Password</Text>
+            <Text style={styles.label}>Password</Text>
             <TextInput
               style={styles.input}
               mode="outlined"
               placeholder="******"
               value={password}
+              textColor="#000"
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               outlineColor="#E0E0E0"
@@ -127,8 +131,9 @@ export default function RegisterScreen() {
               style={styles.input}
               mode="outlined"
               placeholder="Jl."
-              value={alamat}
-              onChangeText={setAlamat}
+              value={address}
+              textColor="#000"
+              onChangeText={setAddress}
               outlineColor="#E0E0E0"
               activeOutlineColor="#1E88E5"
             />
@@ -139,6 +144,7 @@ export default function RegisterScreen() {
                 style={styles.countryCode}
                 mode="outlined"
                 value="+62"
+                textColor="#000"
                 editable={false}
                 outlineColor="#E0E0E0"
                 activeOutlineColor="#1E88E5"
@@ -148,6 +154,7 @@ export default function RegisterScreen() {
                 mode="outlined"
                 placeholder="85314513"
                 value={phoneNumber}
+                textColor="#000"
                 onChangeText={setPhoneNumber}
                 keyboardType="phone-pad"
                 outlineColor="#E0E0E0"

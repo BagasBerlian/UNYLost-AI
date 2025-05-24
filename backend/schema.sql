@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `email` VARCHAR(100) NOT NULL UNIQUE,
   `password` VARCHAR(100) NOT NULL,
   `phone_number` VARCHAR(20) NOT NULL,
+  `address` VARCHAR(255) NOT NULL,
   `role` ENUM('user', 'admin') DEFAULT 'user',
   `is_verified` BOOLEAN DEFAULT FALSE,
   `verification_token` VARCHAR(100),

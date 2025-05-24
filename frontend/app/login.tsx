@@ -64,6 +64,7 @@ export default function LoginScreen() {
               mode="outlined"
               placeholder="user@gmail.com"
               value={email}
+              textColor="#000"
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -77,6 +78,7 @@ export default function LoginScreen() {
               mode="outlined"
               placeholder="******"
               value={password}
+              textColor="#000"
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               outlineColor="#E0E0E0"
