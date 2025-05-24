@@ -1,26 +1,52 @@
-import React, { useEffect } from "react";
-import { View, Text, StyleSheet, Image } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, StyleSheet, Image, Animated } from "react-native";
 import { router } from "expo-router";
 
 export default function SplashScreen() {
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
+    const animationDuration = 4000;
+    const preNavDelay = 1000;
+
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: animationDuration,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: animationDuration,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     const timer = setTimeout(() => {
       router.replace("/login");
-    }, 3000);
+    }, preNavDelay + animationDuration);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [scaleAnim, opacityAnim]);
 
   return (
     <View style={styles.container}>
-      <View style={styles.logoContainer}>
+      <Animated.View
+        style={[
+          styles.logoContainer,
+          {
+            transform: [{ scale: scaleAnim }],
+            opacity: opacityAnim,
+          },
+        ]}
+      >
         <Image
           source={require("../assets/images/logo_unylost.png")}
-          style={styles.logoContainer}
+          style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.tagline}>Find the Lost, Return the Found</Text>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -28,21 +54,15 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1E88E5",
+    backgroundColor: "#1d61e7",
     justifyContent: "center",
     alignItems: "center",
   },
   logoContainer: {
     alignItems: "center",
   },
-  logoText: {
-    color: "white",
-    fontSize: 40,
-    fontWeight: "bold",
-  },
-  tagline: {
-    color: "white",
-    fontSize: 16,
-    marginTop: 10,
+  logo: {
+    width: 400,
+    height: 400,
   },
 });

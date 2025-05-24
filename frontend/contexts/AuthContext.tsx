@@ -29,6 +29,7 @@ interface RegisterData {
   email: string;
   password: string;
   phone_number: string;
+  address: string;
 }
 
 interface AuthProviderProps {
@@ -44,7 +45,7 @@ export const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
 });
 
-const API_URL = "http://192.168.36.105:5000/api";
+const API_URL = "http://localhost:5000/api";
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);

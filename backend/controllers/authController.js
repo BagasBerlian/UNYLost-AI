@@ -17,7 +17,7 @@ exports.register = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { full_name, email, password, phone_number } = req.body;
+    const { full_name, email, password, phone_number, address } = req.body;
 
     db.query(
       "SELECT * FROM users WHERE email = ?",
@@ -42,6 +42,7 @@ exports.register = async (req, res) => {
           email,
           password: hashedPassword,
           phone_number,
+          address,
           verification_token: verificationToken,
         };
 
