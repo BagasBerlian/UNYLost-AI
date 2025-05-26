@@ -16,12 +16,19 @@ function RootLayoutNav() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === "(tabs)";
+    const inTabsGroup = segments[0] === "(tabs)";
 
-    if (!userToken && inAuthGroup) {
-      router.replace("/login");
-    } else if (userToken && !inAuthGroup) {
-      router.replace("/(tabs)/home");
+    if (!userToken) {
+      if (segments[0] !== "login") {
+        router.replace("/login");
+      }
+    } else {
+      const inPublicPages =
+        segments[0] === "report-lost" || segments[0] === "report-found";
+
+      if (!inTabsGroup && !inPublicPages) {
+        router.replace("/(tabs)/home");
+      }
     }
   }, [userToken, segments, isLoading]);
 

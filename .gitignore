@@ -56,6 +56,6 @@ frontend/ios/Pods/
 frontend/ios/*.xcworkspace
 
 # Package lock - optionally gitignore these for cleaner history
-# backend/package-lock.json
-# frontend/package-lock.json
-# frontend/yarn.lock
+backend/package-lock.json
+frontend/package-lock.json
+frontend/yarn.lock 

@@ -1,15 +1,16 @@
+// frontend/app/(tabs)/laporan.tsx
 import React from "react";
 import { View, Text, StyleSheet, SafeAreaView } from "react-native";
 
-export default function FoundItemsScreen() {
+export default function LaporanScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Found Items</Text>
+        <Text style={styles.headerText}>Laporan Anda</Text>
       </View>
       <View style={styles.content}>
-        <Text style={styles.title}>Found Items Screen</Text>
-        <Text>Report or search for found items</Text>
+        <Text style={styles.title}>Laporan</Text>
+        <Text>Anda bisa check semua data laporan anda disini</Text>
       </View>
     </SafeAreaView>
   );
