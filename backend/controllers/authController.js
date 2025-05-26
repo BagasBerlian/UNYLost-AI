@@ -12,12 +12,17 @@ const generateToken = (userId) => {
 
 exports.register = async (req, res) => {
   try {
+    console.log("Register attempt received. Body:", req.body);
+    console.log(validationResult(req));
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { full_name, email, password, phone_number, address } = req.body;
+
+    console.log(full_name, email, password, phone_number, address);
 
     db.query(
       "SELECT * FROM users WHERE email = ?",

@@ -14,6 +14,7 @@ const registerValidation = [
     .withMessage("Nomor telepon harus diisi")
     .isMobilePhone("id-ID")
     .withMessage("Format nomor telepon tidak valid"),
+  body("address").notEmpty().withMessage("Alamat harus diisi"),
 ];
 
 router.post("/register", registerValidation, authController.register);

@@ -35,12 +35,19 @@ export default function RegisterScreen() {
     setLoading(true);
     setError("");
 
+    let normalizedPhoneNumber = phoneNumber.trim();
+    if (normalizedPhoneNumber.startsWith("0")) {
+      normalizedPhoneNumber = `+62${normalizedPhoneNumber.substring(1)}`;
+    } else {
+      normalizedPhoneNumber = `+62${normalizedPhoneNumber}`;
+    }
+
     try {
       const result = await register({
         full_name: fullName,
         email,
         password,
-        phone_number: phoneNumber,
+        phone_number: normalizedPhoneNumber,
         address: address,
       });
 
