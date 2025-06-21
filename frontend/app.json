@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "UNY Lost",
+    "slug": "unylost",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.svg",
+      "resizeMode": "contain",
+      "backgroundColor": "#3478f6"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.uny.lost"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#3478f6"
+      },
+      "package": "com.uny.lost"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": ["expo-font", "expo-image-picker"],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
