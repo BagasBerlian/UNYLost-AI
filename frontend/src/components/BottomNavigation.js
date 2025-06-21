@@ -1,217 +1,94 @@
-// File: frontend/src/components/BottomNavigation.js - UPDATED for Style Preferences
-import React, { useState } from "react";
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Modal,
-  Text,
-  TouchableWithoutFeedback,
-  Platform,
-} from "react-native";
+// File: frontend/src/components/BottomNavigation.js
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 
 export default function BottomNavigation() {
   const navigation = useNavigation();
-  const route = useRoute();
-  const [modalVisible, setModalVisible] = useState(false);
 
-  const handleCloseModal = () => {
-    setTimeout(() => {
-      setModalVisible(false);
-    }, 0);
+  const navigateTo = (screenName) => {
+    navigation.navigate(screenName);
   };
-
-  const handleNavigate = (screen) => {
-    setTimeout(() => {
-      setModalVisible(false);
-      navigation.navigate(screen);
-    }, 0);
-  };
-
-  const menuItems = [
-    { icon: "home", screen: "Dashboard" },
-    { icon: "list", screen: "MyItems" },
-    { icon: "add", isCentral: true },
-    { icon: "notifications", screen: "Notifications" },
-    { icon: "person", screen: "Profile" },
-  ];
 
   return (
-    <View style={styles.outerContainer}>
-      <View style={styles.container}>
-        {menuItems.map((item, index) => {
-          const isActive = route.name === item.screen;
-          if (item.isCentral) {
-            return (
-              <TouchableOpacity
-                key={index}
-                style={styles.addButton}
-                onPress={() => setModalVisible(true)}
-              >
-                <Ionicons name="add" size={32} color="white" />
-              </TouchableOpacity>
-            );
-          }
-          return (
-            <TouchableOpacity
-              key={index}
-              style={styles.navItem}
-              onPress={() => navigation.navigate(item.screen)}
-            >
-              <Ionicons
-                name={isActive ? item.icon : `${item.icon}-outline`}
-                size={24}
-                color={isActive ? "#3b82f6" : "#6b7280"}
-              />
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <Modal
-        animationType="slide" // <--- PERUBAHAN 1: Kembali ke 'slide'
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={handleCloseModal}
+    <View style={styles.container}>
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => navigateTo("Dashboard")}
       >
-        <TouchableWithoutFeedback onPress={handleCloseModal}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Buat Laporan Baru</Text>
-              <Text style={styles.modalSubtitle}>
-                Pilih jenis laporan yang ingin Anda buat
-              </Text>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => handleNavigate("ReportFound")}
-              >
-                <Ionicons name="checkmark-circle" size={24} color="#10b981" />
-                <Text style={styles.modalOptionText}>
-                  Laporan Barang Temuan
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => handleNavigate("ReportLost")}
-              >
-                <Ionicons name="close-circle" size={24} color="#ef4444" />
-                <Text style={styles.modalOptionText}>
-                  Laporan Barang Hilang
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={handleCloseModal}
-              >
-                <Text style={styles.cancelButtonText}>Batal</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        <Ionicons name="home" size={24} color="#3B82F6" />
+        <Text style={styles.tabLabel}>Beranda</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => navigateTo("MyItems")}
+      >
+        <Ionicons name="list" size={24} color="#6B7280" />
+        <Text style={styles.tabLabel}>Barang Saya</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.mainButton}
+        onPress={() => {
+          // Tampilkan menu untuk memilih jenis laporan
+          navigation.navigate("ReportOptions");
+        }}
+      >
+        <Ionicons name="add-circle" size={56} color="#3B82F6" />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => navigateTo("Notifications")}
+      >
+        <Ionicons name="notifications" size={24} color="#6B7280" />
+        <Text style={styles.tabLabel}>Notifikasi</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => navigateTo("Profile")}
+      >
+        <Ionicons name="person" size={24} color="#6B7280" />
+        <Text style={styles.tabLabel}>Profil</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  outerContainer: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-    alignItems: "center",
-  },
   container: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    width: "90%",
-    height: 70,
     backgroundColor: "white",
-    borderRadius: 35,
-    marginBottom: Platform.OS === "ios" ? 30 : 20,
-    elevation: 10,
+    paddingTop: 8,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    elevation: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#3b82f6",
-    alignItems: "center",
-    justifyContent: "center",
-    bottom: 25,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end", // <--- PERUBAHAN 2: Kembali ke 'flex-end'
-    backgroundColor: "transparent", // <--- PERUBAHAN 3: Latar belakang dibuat transparan
-  },
-  modalContent: {
-    backgroundColor: "white",
-    padding: 24,
-    borderTopLeftRadius: 20, // <--- PERUBAHAN 4: Sudut kembali seperti semula
-    borderTopRightRadius: 20,
-    alignItems: "center",
-    // Menambahkan shadow agar terlihat 'mengambang' di atas konten
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
+    shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 20,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  modalOption: {
-    flexDirection: "row",
+  tabItem: {
+    flex: 1,
     alignItems: "center",
-    backgroundColor: "#f3f4f6",
-    padding: 16,
-    borderRadius: 12,
-    width: "100%",
-    marginBottom: 12,
+    justifyContent: "center",
   },
-  modalOptionText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1f2937",
-    marginLeft: 12,
+  tabLabel: {
+    fontSize: 12,
+    marginTop: 4,
+    color: "#6B7280",
   },
-  cancelButton: {
-    marginTop: 12,
-    padding: 12,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    color: "#6b7280",
-    fontWeight: "600",
+  mainButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -30,
   },
 });

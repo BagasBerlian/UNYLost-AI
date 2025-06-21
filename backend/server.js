@@ -35,6 +35,14 @@ db.connect((err) => {
   }
 });
 
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    message: "UNYLost API is running",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get("/", (req, res) => {
   res.send("UNYLost API is running");
 });

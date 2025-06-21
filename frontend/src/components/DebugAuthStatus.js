@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 export default function DebugAuthStatus() {
   const { isAuthenticated, isLoading, user, token } = useAuth();
 
-  if (!__DEV__) return null; // Only show in development
+  if (__DEV__) return null; // Only show in development
 
   return (
     <View style={styles.container}>

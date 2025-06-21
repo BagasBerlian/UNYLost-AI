@@ -1,270 +1,258 @@
-import React, { useState, useCallback, useEffect } from "react";
+// File: frontend/src/screens/MyItemsScreen.js
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
-  ScrollView,
-  RefreshControl,
+  TouchableOpacity,
+  FlatList,
+  Image,
   ActivityIndicator,
+  RefreshControl,
   Alert,
-  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import ItemCard from "../components/ItemCard";
-import { API_CONFIG } from "../config/api";
+import { foundItemAPI, lostItemAPI } from "../services/api";
+import BottomNavigation from "../components/BottomNavigation";
 
-const { width } = Dimensions.get("window");
+export default function MyItemsScreen() {
+  const navigation = useNavigation();
 
-const dummyFoundItems = [
-  {
-    id: "found-1",
-    name: "Kunci Mobil Toyota",
-    description:
-      "Ditemukan kunci mobil dengan gantungan menara Eiffel di dekat parkiran rektorat.",
-    location: "Gedung Rektorat UNY",
-    createdAt: "2025-06-12T10:00:00Z",
-    images: [
-      "https://media.karousell.com/media/photos/products/2024/8/2/cari_hp_iphone_15_14_promax_ba_1722579763_50f13e90_progressive",
-    ],
-    status: "claimed",
-    type: "found",
-    user: { name: "Bagas" },
-  },
-  {
-    id: "found-2",
-    name: "Headphone Sony WH-1000XM4",
-    description:
-      "Headphone dalam case hitam, ditemukan di perpustakaan pusat, lantai 2.",
-    location: "Perpustakaan Pusat UNY",
-    createdAt: "2025-06-4T15:30:00Z",
-    images: [
-      "https://www.static-src.com/wcsstore/Indraprastha/images/catalog/full//95/MTA-59702422/brd-69012_botol-minum-thermos-stainless-steel-800-ml-hd-688_full01.jpg",
-    ],
-    type: "found",
-    status: "pending",
-    user: { name: "Bagas" },
-  },
-];
-
-const dummyLostItems = [
-  {
-    id: "lost-1",
-    name: "Dompet Kulit Coklat",
-    description:
-      "Dompet berisi KTP, SIM, dan KTM. Terakhir terlihat di kantin FT.",
-    location: "Kantin Fakultas Teknik",
-    createdAt: "2025-06-16T12:00:00Z",
-    images: [
-      "https://id-test-11.slatic.net/p/664814516ac5c05b6e3063ef805eb91c.jpg",
-    ],
-    type: "lost",
-    user: { name: "Bagas" },
-  },
-];
-
-const dummyClaims = [
-  {
-    id: "claim-1",
-    status: "Pending",
-    createdAt: "2025-06-18T09:00:00Z",
-    type: "claims",
-    item: {
-      id: "item-xyz",
-      name: "iPhone 13 Pro",
-      description: "Ditemukan iPhone 13 Pro warna Sierra Blue di dekat FIP.",
-      location: "Fakultas Ilmu Pendidikan",
-      createdAt: "2025-06-17T08:00:00Z",
-      images: [
-        "https://imgx.gridoto.com/crop/0x0:1280x853/700x465/filters:watermark(file/2017/gridoto/img/watermark.png,5,5,60)/photo/gridoto/2017/11/23/3353269077.jpeg",
-      ],
-      type: "found",
-      user: { name: "Penemu Baik" },
-    },
-  },
-  {
-    id: "claim-2",
-    status: "Approved",
-    createdAt: "2025-06-15T11:00:00Z",
-    type: "claims",
-    item: {
-      id: "item-abc",
-      name: "Botol Minum Corkcicle",
-      description: "Botol minum warna pink, ditemukan di GOR.",
-      location: "GOR UNY",
-      createdAt: "2025-06-14T17:00:00Z",
-      images: [
-        "https://filebroker-cdn.lazada.co.id/kf/Sdb09655bd0654c2cbd0c4cc7f73d7e517.jpg",
-      ],
-      type: "found",
-      user: { name: "Admin GOR" },
-    },
-  },
-];
-
-export default function MyItemsScreen({ navigation }) {
-  const [activeTab, setActiveTab] = useState("found");
-  const [items, setItems] = useState({
-    found: [],
-    lost: [],
-    claims: [],
-  });
-  const [isLoading, setIsLoading] = useState(true); // Mulai dengan true
+  const [activeTab, setActiveTab] = useState("lost");
+  const [lostItems, setLostItems] = useState([]);
+  const [foundItems, setFoundItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [userEmail, setUserEmail] = useState("user.demo@uny.ac.id");
 
-  // Tab configuration
-  const tabs = [
-    { id: "found", label: "Temuan", count: items.found.length },
-    { id: "lost", label: "Hilang", count: items.lost.length },
-    { id: "claims", label: "Klaim", count: items.claims.length },
-  ];
-
-  // Fungsi untuk memuat data dummy
-  const loadDummyData = useCallback(() => {
-    setIsLoading(true);
-    // Simulasi jeda jaringan
-    setTimeout(() => {
-      setItems({
-        found: dummyFoundItems,
-        lost: dummyLostItems,
-        claims: dummyClaims,
-      });
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }, 1000); // Jeda 1 detik
+  useEffect(() => {
+    loadData();
   }, []);
 
-  // Handle refresh
-  const handleRefresh = useCallback(() => {
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      await Promise.all([fetchLostItems(), fetchFoundItems()]);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      Alert.alert("Error", "Gagal memuat data barang");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchLostItems = async () => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      const response = await lostItemAPI.getMyLostItems(token);
+
+      if (response.success) {
+        setLostItems(response.data);
+      } else {
+        console.error("Failed to fetch lost items:", response.message);
+      }
+    } catch (error) {
+      console.error("Error fetching lost items:", error);
+      throw error;
+    }
+  };
+
+  const fetchFoundItems = async () => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      const response = await foundItemAPI.getMyFoundItems(token);
+
+      if (response.success) {
+        setFoundItems(response.data);
+      } else {
+        console.error("Failed to fetch found items:", response.message);
+      }
+    } catch (error) {
+      console.error("Error fetching found items:", error);
+      throw error;
+    }
+  };
+
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    loadDummyData();
-  }, [loadDummyData]);
-
-  // Handle item press
-  const handleItemPress = (data) => {
-    console.log("📱 Item pressed:", data);
-
-    // Navigasi ke detail berdasarkan tipe data
-    // Untuk 'found' & 'lost', data adalah item itu sendiri
-    // Untuk 'claims', data adalah objek klaim
-    if (data.type === "found") {
-      navigation.navigate("FoundItemDetail", {
-        itemId: data.id,
-        isOwner: true,
-      });
-    } else if (data.type === "lost") {
-      navigation.navigate("LostItemDetail", {
-        itemId: data.id,
-        isOwner: true,
-      });
-    } else if (data.type === "claims") {
-      navigation.navigate("ClaimDetail", {
-        claimId: data.id,
-      });
+    try {
+      await loadData();
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
-  // Gunakan useFocusEffect untuk memuat data setiap kali layar ini aktif
-  useFocusEffect(
-    useCallback(() => {
-      loadDummyData();
-    }, [loadDummyData])
-  );
-
-  // Get current items based on active tab
-  const getCurrentItems = () => {
-    return items[activeTab] || [];
+  const handleItemPress = (item, type) => {
+    // Navigate to detail screen (akan diimplementasikan nanti)
+    console.log(`View ${type} item:`, item.id);
+    Alert.alert("Info", "Fitur detail barang akan segera tersedia");
   };
 
-  // Render loading state
-  if (isLoading && !isRefreshing) {
-    return (
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Item Saya</Text>
-        </View>
+  const handleDeleteItem = async (item, type) => {
+    Alert.alert(
+      "Konfirmasi Hapus",
+      `Apakah Anda yakin ingin menghapus ${
+        type === "lost" ? "barang hilang" : "barang temuan"
+      } ini?`,
+      [
+        { text: "Batal", style: "cancel" },
+        {
+          text: "Hapus",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              const token = await AsyncStorage.getItem("userToken");
 
-        {/* Loading */}
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563eb" />
-          <Text style={styles.loadingText}>Memuat data...</Text>
-        </View>
-      </View>
-    );
-  }
+              let response;
+              if (type === "lost") {
+                response = await lostItemAPI.deleteLostItem(item.id, token);
+              } else {
+                response = await foundItemAPI.deleteFoundItem(item.id, token);
+              }
 
-  // Render tab content
-  const renderTabContent = () => {
-    const currentItems = getCurrentItems();
-
-    if (currentItems.length === 0 && !isLoading) {
-      return (
-        <View style={styles.emptyContainer}>
-          <Ionicons
-            name={
-              activeTab === "found"
-                ? "cube-outline"
-                : activeTab === "lost"
-                ? "search-outline"
-                : "document-outline"
+              if (response.success) {
+                if (type === "lost") {
+                  setLostItems(lostItems.filter((i) => i.id !== item.id));
+                } else {
+                  setFoundItems(foundItems.filter((i) => i.id !== item.id));
+                }
+                Alert.alert("Sukses", "Barang berhasil dihapus");
+              } else {
+                Alert.alert(
+                  "Error",
+                  response.message || "Gagal menghapus barang"
+                );
+              }
+            } catch (error) {
+              console.error("Error deleting item:", error);
+              Alert.alert("Error", "Terjadi kesalahan saat menghapus barang");
+            } finally {
+              setIsLoading(false);
             }
-            size={64}
-            color="#d1d5db"
-          />
-          <Text style={styles.emptyText}>
-            {activeTab === "found"
-              ? "Belum ada barang temuan"
-              : activeTab === "lost"
-              ? "Belum ada barang hilang"
-              : "Belum ada klaim"}
-          </Text>
-        </View>
-      );
-    }
-
-    return (
-      <ScrollView
-        style={styles.itemsList}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
-        }
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
-      >
-        {currentItems.map((data, index) => {
-          // Jika tab adalah 'claims', 'item' berada di dalam 'data.item'
-          // Jika tidak, 'item' adalah 'data' itu sendiri
-          const item = activeTab === "claims" ? data.item : data;
-          const key = activeTab === "claims" ? data.id : item.id;
-
-          // Menambahkan properti status untuk ditampilkan di ItemCard jika itu adalah klaim
-          if (activeTab === "claims") {
-            item.claimStatus = data.status;
-          }
-
-          return (
-            <ItemCard
-              key={key || index}
-              item={item}
-              type={item.type} // Gunakan tipe asli dari item
-              onPress={() => handleItemPress(data)}
-              isOwner={true}
-            />
-          );
-        })}
-      </ScrollView>
+          },
+        },
+      ]
     );
   };
+
+  const renderItem = ({ item, type }) => {
+    const isLost = type === "lost";
+    const statusColor = isLost
+      ? item.status === "found"
+        ? "#10B981"
+        : "#EF4444"
+      : item.status === "claimed"
+      ? "#10B981"
+      : "#3B82F6";
+
+    const statusText = isLost
+      ? item.status === "found"
+        ? "Ditemukan"
+        : "Hilang"
+      : item.status === "claimed"
+      ? "Diklaim"
+      : "Menunggu";
+
+    return (
+      <TouchableOpacity
+        style={styles.itemCard}
+        onPress={() => handleItemPress(item, type)}
+      >
+        <View style={styles.itemContent}>
+          <View style={styles.imageContainer}>
+            {item.image_url ? (
+              <Image
+                source={{ uri: item.image_url }}
+                style={styles.itemImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View
+                style={[
+                  styles.placeholderImage,
+                  { backgroundColor: isLost ? "#FECACA" : "#BFDBFE" },
+                ]}
+              >
+                <Ionicons
+                  name={isLost ? "search" : "basket"}
+                  size={30}
+                  color={isLost ? "#EF4444" : "#3B82F6"}
+                />
+              </View>
+            )}
+          </View>
+          <View style={styles.itemDetails}>
+            <Text style={styles.itemName} numberOfLines={1}>
+              {item.item_name}
+            </Text>
+            <Text style={styles.itemCategory} numberOfLines={1}>
+              {item.category_name}
+            </Text>
+            <Text style={styles.itemLocation} numberOfLines={1}>
+              {isLost ? item.last_seen_location : item.location}
+            </Text>
+            <View style={styles.itemFooter}>
+              <Text style={styles.itemDate}>
+                {new Date(
+                  isLost ? item.lost_date : item.found_date
+                ).toLocaleDateString("id-ID")}
+              </Text>
+              <View
+                style={[styles.statusBadge, { backgroundColor: statusColor }]}
+              >
+                <Text style={styles.statusText}>{statusText}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteItem(item, type)}
+        >
+          <Ionicons name="trash-outline" size={20} color="#EF4444" />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
+
+  const EmptyListComponent = ({ type }) => (
+    <View style={styles.emptyContainer}>
+      <Ionicons
+        name={type === "lost" ? "search" : "basket"}
+        size={64}
+        color={type === "lost" ? "#EF4444" : "#3B82F6"}
+        style={{ opacity: 0.5 }}
+      />
+      <Text style={styles.emptyTitle}>
+        Belum ada {type === "lost" ? "barang hilang" : "barang temuan"}
+      </Text>
+      <Text style={styles.emptyText}>
+        {type === "lost"
+          ? "Anda belum melaporkan barang hilang"
+          : "Anda belum melaporkan barang temuan"}
+      </Text>
+      <TouchableOpacity
+        style={[
+          styles.reportButton,
+          {
+            backgroundColor: type === "lost" ? "#EF4444" : "#3B82F6",
+          },
+        ]}
+        onPress={() =>
+          navigation.navigate(type === "lost" ? "ReportLost" : "ReportFound")
+        }
+      >
+        <Ionicons name="add" size={20} color="white" />
+        <Text style={styles.reportButtonText}>
+          Laporkan {type === "lost" ? "Barang Hilang" : "Barang Temuan"}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -276,43 +264,70 @@ export default function MyItemsScreen({ navigation }) {
         >
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Item Saya</Text>
+        <Text style={styles.headerTitle}>Barang Saya</Text>
       </View>
 
-      {/* User Info */}
-      {userEmail && (
-        <View style={styles.userInfo}>
-          <Text style={styles.userText}>📧 {userEmail}</Text>
-        </View>
-      )}
-
       {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={[styles.tab, activeTab === tab.id && styles.activeTab]}
-            onPress={() => setActiveTab(tab.id)}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "lost" && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab("lost")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "lost" && styles.activeTabText,
+            ]}
           >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === tab.id && styles.activeTabText,
-              ]}
-            >
-              {tab.label}
-            </Text>
-            {tab.count > 0 && (
-              <View style={styles.tabBadge}>
-                <Text style={styles.tabBadgeText}>{tab.count}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+            Barang Hilang
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "found" && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab("found")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "found" && styles.activeTabText,
+            ]}
+          >
+            Barang Temuan
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
-      {renderTabContent()}
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3B82F6" />
+          <Text style={styles.loadingText}>Memuat data...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={activeTab === "lost" ? lostItems : foundItems}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => renderItem({ item, type: activeTab })}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+            />
+          }
+          ListEmptyComponent={<EmptyListComponent type={activeTab} />}
+        />
+      )}
+
+      {/* Bottom Navigation */}
+      <BottomNavigation />
     </View>
   );
 }
@@ -320,47 +335,52 @@ export default function MyItemsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#F3F4F6",
   },
   header: {
-    backgroundColor: "#2563eb",
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
+    backgroundColor: "#3B82F6",
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
     elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   backButton: {
-    padding: 8,
-    marginRight: 16, // Memberi jarak agar judul bisa center
-    position: "absolute", // Membuat tombol back tidak mendorong judul
-    left: 16,
-    top: 50,
-    zIndex: 1,
+    marginRight: 16,
   },
   headerTitle: {
-    flex: 1,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
     color: "white",
-    textAlign: "center",
   },
-  userInfo: {
+  tabContainer: {
+    flexDirection: "row",
     backgroundColor: "white",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
   },
-  userText: {
-    fontSize: 14,
-    color: "#6b7280",
-    textAlign: "center",
+  tabButton: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  activeTabButton: {
+    borderBottomWidth: 3,
+    borderBottomColor: "#3B82F6",
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#6B7280",
+  },
+  activeTabText: {
+    color: "#3B82F6",
   },
   loadingContainer: {
     flex: 1,
@@ -368,68 +388,119 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 12,
     fontSize: 16,
-    color: "#6b7280",
+    color: "#6B7280",
   },
-  tabsContainer: {
+  listContent: {
+    padding: 16,
+    paddingBottom: 80,
+  },
+  itemCard: {
     backgroundColor: "white",
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 16,
     flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  tab: {
+  itemContent: {
     flex: 1,
     flexDirection: "row",
-    alignItems: "center",
+  },
+  imageContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    overflow: "hidden",
+    marginRight: 12,
+  },
+  itemImage: {
+    width: "100%",
+    height: "100%",
+  },
+  placeholderImage: {
+    width: "100%",
+    height: "100%",
     justifyContent: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  activeTab: {
-    borderBottomColor: "#2563eb",
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#6b7280",
-  },
-  activeTabText: {
-    color: "#2563eb",
-    fontWeight: "600",
-  },
-  tabBadge: {
-    backgroundColor: "#ef4444",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginLeft: 6,
-    minWidth: 20,
     alignItems: "center",
   },
-  tabBadgeText: {
-    color: "white",
+  itemDetails: {
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  itemName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#374151",
+    marginBottom: 4,
+  },
+  itemCategory: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  itemLocation: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginBottom: 8,
+  },
+  itemFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  itemDate: {
+    fontSize: 12,
+    color: "#9CA3AF",
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
     fontSize: 12,
     fontWeight: "bold",
+    color: "white",
   },
-  itemsList: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
+  deleteButton: {
+    padding: 8,
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 32,
+    justifyContent: "center",
+    padding: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#374151",
+    marginTop: 16,
+    marginBottom: 8,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#374151",
+    fontSize: 16,
+    color: "#6B7280",
     textAlign: "center",
-    marginTop: 16,
+    marginBottom: 24,
+  },
+  reportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  reportButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "white",
+    marginLeft: 8,
   },
 });

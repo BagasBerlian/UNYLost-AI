@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const { validationResult } = require("express-validator");
 const db = require("../config/database");
 const crypto = require("crypto");
+const fontteService = require("../services/fontteService");
 
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -73,6 +74,77 @@ exports.register = async (req, res) => {
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.verifyWhatsapp = async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: "Nomor telepon harus diisi",
+      });
+    }
+
+    // Format nomor telepon untuk pengecekan
+    let formattedPhone = phone;
+
+    // Hapus karakter non-digit
+    formattedPhone = formattedPhone.replace(/\D/g, "");
+
+    // Verifikasi format
+    if (formattedPhone.length < 10 || formattedPhone.length > 15) {
+      return res.status(400).json({
+        success: false,
+        message: "Format nomor telepon tidak valid",
+      });
+    }
+
+    // Cek apakah nomor terdaftar di WhatsApp
+    const checkResult = await fontteService.checkWhatsappNumber(formattedPhone);
+
+    if (!checkResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: checkResult.message,
+      });
+    }
+
+    if (!checkResult.isRegistered) {
+      return res.status(400).json({
+        success: false,
+        message: "Nomor ini tidak terdaftar di WhatsApp",
+      });
+    }
+
+    // Kirim kode verifikasi jika nomor terdaftar
+    const sendResult = await fontteService.sendVerificationCode(formattedPhone);
+
+    if (!sendResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Gagal mengirim kode verifikasi",
+      });
+    }
+
+    // PENTING: Pada produksi, simpan kode di database dan JANGAN kembalikan ke client
+    // Untuk keperluan development, kita kembalikan kode verifikasi
+    // Pada produksi, gunakan token untuk mengautentikasi
+    return res.status(200).json({
+      success: true,
+      message: "Kode verifikasi telah dikirim ke WhatsApp Anda",
+      formattedNumber: checkResult.number,
+      code:
+        process.env.NODE_ENV === "development" ? sendResult.code : undefined,
+    });
+  } catch (error) {
+    console.error("WhatsApp verification error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Terjadi kesalahan saat verifikasi WhatsApp",
+    });
   }
 };
 

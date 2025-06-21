@@ -1,26 +1,30 @@
-// File: frontend/App.js - UPDATED WITH ALL SCREENS
+// File: frontend/App.js
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { StatusBar } from "expo-status-bar";
 
-// Import existing screens
+// Import auth screens
 import SplashScreen from "./src/screens/auth/SplashScreen";
 import LoginScreen from "./src/screens/auth/LoginScreen";
 import RegisterScreen from "./src/screens/auth/RegisterScreen";
 import VerificationScreen from "./src/screens/auth/VerificationScreen";
-import DashboardScreen from "./src/screens/DashboardScreen";
 
-// Import new screens
+// Import main app screens
+import DashboardScreen from "./src/screens/DashboardScreen";
 import ReportFoundScreen from "./src/screens/ReportFoundScreen";
 import ReportLostScreen from "./src/screens/ReportLostScreen";
 import ReportSuccessScreen from "./src/screens/ReportSuccessScreen";
+import ReportOptionsScreen from "./src/screens/ReportOptionsScreen";
 import MyItemsScreen from "./src/screens/MyItemsScreen";
 import NotificationsScreen from "./src/screens/NotificationsScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 
 // Import context
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
+
+// Import debug components (only in development)
+import DebugAuthStatus from "./src/components/DebugAuthStatus";
 
 const Stack = createStackNavigator();
 
@@ -52,6 +56,7 @@ function AppStack() {
       }}
     >
       <Stack.Screen name="Dashboard" component={DashboardScreen} />
+      <Stack.Screen name="ReportOptions" component={ReportOptionsScreen} />
       <Stack.Screen name="ReportFound" component={ReportFoundScreen} />
       <Stack.Screen name="ReportLost" component={ReportLostScreen} />
       <Stack.Screen name="ReportSuccess" component={ReportSuccessScreen} />
@@ -75,6 +80,7 @@ function AppNavigator() {
     <>
       <StatusBar style="auto" />
       {isAuthenticated ? <AppStack /> : <AuthStack />}
+      {__DEV__ && <DebugAuthStatus />}
     </>
   );
 }

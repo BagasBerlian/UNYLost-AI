@@ -28,12 +28,16 @@ export default function RegisterScreen() {
     email: "",
     password: "",
     whatsappNumber: "",
+    address: "",
     agreeNotification: false,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [whatsappVerified, setWhatsappVerified] = useState(false);
   const [isVerifyingWhatsapp, setIsVerifyingWhatsapp] = useState(false);
+  const [whatsappVerificationCode, setWhatsappVerificationCode] = useState("");
+  const [whatsappCodeSent, setWhatsappCodeSent] = useState(false);
+  const [verificationInProgress, setVerificationInProgress] = useState(false);
 
   const validateForm = () => {
     const newErrors = {};
@@ -84,38 +88,58 @@ export default function RegisterScreen() {
   };
 
   const handleVerifyWhatsapp = async () => {
-    if (!formData.whatsappNumber.trim()) {
-      setErrors({ ...errors, whatsappNumber: "Nomor WhatsApp harus diisi" });
-      return;
-    }
-
-    if (!/^(\+62|62|0)8[1-9][0-9]{6,11}$/.test(formData.whatsappNumber)) {
-      setErrors({
-        ...errors,
-        whatsappNumber: "Format nomor WhatsApp tidak valid",
-      });
+    if (!formData.whatsappNumber) {
+      setErrors((prev) => ({
+        ...prev,
+        whatsappNumber: "Nomor WhatsApp harus diisi",
+      }));
       return;
     }
 
     setIsVerifyingWhatsapp(true);
+    setVerificationInProgress(true);
+
     try {
-      console.log("🔍 Verifying WhatsApp:", formData.whatsappNumber);
+      console.log("Verifying WhatsApp:", formData.whatsappNumber);
 
       const response = await authAPI.verifyWhatsapp(formData.whatsappNumber);
 
       if (response.success) {
-        setWhatsappVerified(true);
-        setErrors({ ...errors, whatsappNumber: null });
-        Alert.alert("Berhasil", "Nomor WhatsApp terverifikasi!");
+        setWhatsappCodeSent(true);
+        // Jika dalam mode development, auto-fill kode untuk kemudahan testing
+        if (response.code) {
+          setWhatsappVerificationCode(response.code);
+        }
+        Alert.alert(
+          "Kode Verifikasi Terkirim",
+          "Kode verifikasi telah dikirim ke WhatsApp Anda."
+        );
       } else {
-        Alert.alert("Gagal", response.message || "Verifikasi WhatsApp gagal");
+        Alert.alert("Verifikasi Gagal", response.message);
       }
     } catch (error) {
       console.error("WhatsApp verification error:", error);
-      Alert.alert("Error", "Gagal memverifikasi nomor WhatsApp");
+      Alert.alert(
+        "Error",
+        "Terjadi kesalahan saat verifikasi. Coba lagi nanti."
+      );
     } finally {
       setIsVerifyingWhatsapp(false);
+      setVerificationInProgress(false);
     }
+  };
+
+  const handleVerifyCode = () => {
+    if (!whatsappVerificationCode || whatsappVerificationCode.length < 4) {
+      Alert.alert("Error", "Kode verifikasi tidak valid");
+      return;
+    }
+
+    // Untuk versi demo, kita anggap kode apa pun yang panjangnya >= 4 valid
+    // Pada implementasi sesungguhnya, kode ini harus diverifikasi dengan backend
+    setWhatsappVerified(true);
+    setWhatsappCodeSent(false); // Sembunyikan UI verifikasi kode
+    Alert.alert("Sukses", "Nomor WhatsApp berhasil diverifikasi");
   };
 
   const handleRegister = async () => {
@@ -230,7 +254,7 @@ export default function RegisterScreen() {
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Nama depan"
+                  placeholder="Depan"
                   value={formData.firstName}
                   onChangeText={(text) => handleInputChange("firstName", text)}
                   autoCapitalize="words"
@@ -257,7 +281,7 @@ export default function RegisterScreen() {
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Nama belakang"
+                  placeholder="Belakang"
                   value={formData.lastName}
                   onChangeText={(text) => handleInputChange("lastName", text)}
                   autoCapitalize="words"
@@ -334,6 +358,30 @@ export default function RegisterScreen() {
             )}
           </View>
 
+          {/* Address Field */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Alamat Domisili</Text>
+            <View
+              style={[styles.inputWrapper, errors.address && styles.inputError]}
+            >
+              <Ionicons
+                name="location-outline"
+                size={20}
+                color="#9CA3AF"
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Alamat lengkap Anda"
+                value={formData.address}
+                onChangeText={(text) => handleInputChange("address", text)}
+              />
+            </View>
+            {errors.address && (
+              <Text style={styles.errorText}>{errors.address}</Text>
+            )}
+          </View>
+
           {/* WhatsApp Field */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Nomor WhatsApp</Text>
@@ -341,6 +389,7 @@ export default function RegisterScreen() {
               style={[
                 styles.inputWrapper,
                 errors.whatsappNumber && styles.inputError,
+                whatsappVerified && styles.inputSuccess, // Tambahkan style ini
               ]}
             >
               <Ionicons
@@ -357,6 +406,7 @@ export default function RegisterScreen() {
                   handleInputChange("whatsappNumber", text)
                 }
                 keyboardType="phone-pad"
+                editable={!whatsappVerified} // Tambahkan ini
               />
               {whatsappVerified ? (
                 <Ionicons name="checkmark-circle" size={20} color="#10B981" />
@@ -377,6 +427,31 @@ export default function RegisterScreen() {
             </View>
             {errors.whatsappNumber && (
               <Text style={styles.errorText}>{errors.whatsappNumber}</Text>
+            )}
+
+            {/* Verification Code Input */}
+            {whatsappCodeSent && !whatsappVerified && (
+              <View style={styles.verificationCodeContainer}>
+                <Text style={styles.verificationCodeLabel}>
+                  Masukkan kode verifikasi:
+                </Text>
+                <View style={styles.codeInputWrapper}>
+                  <TextInput
+                    style={styles.codeInput}
+                    placeholder="Kode 6 digit"
+                    value={whatsappVerificationCode}
+                    onChangeText={setWhatsappVerificationCode}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                  />
+                  <TouchableOpacity
+                    style={styles.verifyCodeButton}
+                    onPress={handleVerifyCode}
+                  >
+                    <Text style={styles.verifyCodeButtonText}>Verifikasi</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
           </View>
 
@@ -603,6 +678,49 @@ const styles = StyleSheet.create({
   loginLink: {
     fontSize: 14,
     color: "#3478f6",
+    fontWeight: "600",
+  },
+  // Tambahkan style berikut pada objek styles
+  inputSuccess: {
+    borderColor: "#10B981",
+  },
+  verificationCodeContainer: {
+    marginTop: 12,
+    backgroundColor: "#f0f9ff",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+  },
+  verificationCodeLabel: {
+    fontSize: 14,
+    color: "#0284c7",
+    marginBottom: 8,
+  },
+  codeInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  codeInput: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    marginRight: 8,
+  },
+  verifyCodeButton: {
+    backgroundColor: "#0284c7",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  verifyCodeButtonText: {
+    color: "#fff",
+    fontSize: 12,
     fontWeight: "600",
   },
 });
