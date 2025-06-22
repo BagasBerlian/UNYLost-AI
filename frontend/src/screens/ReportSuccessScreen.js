@@ -1,12 +1,10 @@
-// File: frontend/src/screens/ReportSuccessScreen.js
 import React from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
-  ScrollView,
+  SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -14,258 +12,215 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 export default function ReportSuccessScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { type, itemName, itemId } = route.params || {};
 
-  const isLost = type === "lost";
-  const mainColor = isLost ? "#EF4444" : "#3B82F6";
-
-  const handleGoHome = () => {
-    navigation.navigate("Dashboard");
+  // Get params
+  const { type, itemId, reportId } = route.params || {
+    type: "found",
+    itemId: null,
+    reportId: "UNY2023051",
   };
 
-  const handleViewItem = () => {
-    // Akan diimplementasikan nanti
+  const handleViewMyItems = () => {
     navigation.navigate("MyItems");
   };
 
+  const handleBackToDashboard = () => {
+    navigation.navigate("Dashboard");
+  };
+
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: mainColor }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Laporan Berhasil</Text>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        {/* Success Icon */}
+        <View style={styles.iconContainer}>
+          <Ionicons name="checkmark" size={48} color="white" />
+        </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-      >
-        <View style={styles.successContainer}>
-          {/* Success Icon */}
-          <View style={[styles.iconContainer, { backgroundColor: mainColor }]}>
-            <Ionicons name="checkmark" size={64} color="white" />
+        {/* Success Message */}
+        <Text style={styles.title}>Laporan Berhasil!</Text>
+
+        <Text style={styles.message}>
+          Terima kasih telah menggunakan{" "}
+          <Text style={styles.appName}>UNYLost</Text>. Laporan Anda telah
+          berhasil dikirim dan sedang diproses.
+        </Text>
+
+        {/* Auto-matching Info */}
+        <View style={styles.infoBox}>
+          <View style={styles.infoHeader}>
+            <Ionicons name="information-circle" size={24} color="#3478F6" />
+            <Text style={styles.infoTitle}>Pencocokan Otomatis</Text>
           </View>
-
-          {/* Success Message */}
-          <Text style={styles.successTitle}>Laporan Berhasil Dibuat!</Text>
-          <Text style={styles.successMessage}>
-            {isLost
-              ? `Laporan barang hilang "${itemName}" telah berhasil dibuat. Kami akan mencarikan barang temuan yang cocok.`
-              : `Laporan barang temuan "${itemName}" telah berhasil dibuat. Terima kasih atas kepedulian Anda.`}
+          <Text style={styles.infoText}>
+            Sistem kami akan mencocokkan laporan Anda dengan laporan lain yang
+            relevan. Cek hasil pencocokan di menu "Barang Saya".
           </Text>
+        </View>
 
-          {/* Item ID */}
-          <View style={styles.itemIdContainer}>
-            <Text style={styles.itemIdLabel}>ID Laporan:</Text>
-            <Text style={styles.itemId}>{itemId}</Text>
+        {/* Next Steps */}
+        <View style={styles.stepsContainer}>
+          <Text style={styles.stepsTitle}>Langkah Selanjutnya:</Text>
+
+          <View style={styles.stepItem}>
+            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+            <Text style={styles.stepText}>
+              Anda akan menerima notifikasi jika ada kecocokan
+            </Text>
           </View>
 
-          {/* What's Next */}
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoTitle}>Langkah Selanjutnya:</Text>
-            <View style={styles.infoItem}>
-              <Ionicons
-                name="notifications-outline"
-                size={24}
-                color={mainColor}
-                style={styles.infoIcon}
-              />
-              <Text style={styles.infoText}>
-                Anda akan menerima notifikasi jika{" "}
-                {isLost
-                  ? "ada barang temuan yang cocok"
-                  : "pemilik mengklaim barang ini"}
-                .
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Ionicons
-                name="list-outline"
-                size={24}
-                color={mainColor}
-                style={styles.infoIcon}
-              />
-              <Text style={styles.infoText}>
-                Anda dapat melihat dan mengelola laporan ini di menu "Barang
-                Saya".
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Ionicons
-                name="search-outline"
-                size={24}
-                color={mainColor}
-                style={styles.infoIcon}
-              />
-              <Text style={styles.infoText}>
-                {isLost
-                  ? "Kami akan mencari kecocokan otomatis dengan barang temuan."
-                  : "Kami akan mencari kecocokan otomatis dengan barang hilang."}
-              </Text>
-            </View>
+          <View style={styles.stepItem}>
+            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+            <Text style={styles.stepText}>
+              Pantau status laporan Anda di menu "Barang Saya"
+            </Text>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: mainColor }]}
-              onPress={handleViewItem}
-            >
-              <Ionicons name="list" size={20} color="white" />
-              <Text style={styles.buttonText}>Lihat Barang Saya</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.outlineButton,
-                { borderColor: mainColor },
-              ]}
-              onPress={handleGoHome}
-            >
-              <Ionicons name="home" size={20} color={mainColor} />
-              <Text style={[styles.buttonText, { color: mainColor }]}>
-                Kembali ke Beranda
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.stepItem}>
+            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+            <Text style={styles.stepText}>
+              Jika ada kecocokan, Anda dapat menghubungi pihak terkait
+            </Text>
           </View>
         </View>
-      </ScrollView>
-    </View>
+
+        {/* Action Buttons */}
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleViewMyItems}
+        >
+          <Text style={styles.primaryButtonText}>Lihat Barang Saya</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={handleBackToDashboard}
+        >
+          <Text style={styles.secondaryButtonText}>Kembali ke Beranda</Text>
+        </TouchableOpacity>
+
+        {/* Report ID */}
+        <Text style={styles.reportId}>ID Laporan: {reportId}</Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
-  },
-  header: {
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "white",
+    backgroundColor: "#F5F5F7",
   },
   content: {
     flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-  },
-  successContainer: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 24,
-    marginVertical: 16,
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 24,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#4CAF50",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 24,
   },
-  successTitle: {
-    fontSize: 22,
+  title: {
+    fontSize: 24,
     fontWeight: "bold",
-    color: "#374151",
-    marginBottom: 12,
+    color: "#333",
+    marginBottom: 16,
     textAlign: "center",
   },
-  successMessage: {
+  message: {
     fontSize: 16,
-    color: "#6B7280",
+    color: "#666",
     textAlign: "center",
     marginBottom: 24,
-    lineHeight: 24,
+    lineHeight: 22,
   },
-  itemIdContainer: {
+  appName: {
+    fontWeight: "bold",
+    color: "#3478F6",
+  },
+  infoBox: {
+    backgroundColor: "#E8F1FF",
+    borderRadius: 12,
+    padding: 16,
+    width: "100%",
+    marginBottom: 24,
+  },
+  infoHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
-    padding: 12,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 8,
-    width: "100%",
-    justifyContent: "center",
-  },
-  itemIdLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#374151",
-    marginRight: 8,
-  },
-  itemId: {
-    fontSize: 16,
-    color: "#6B7280",
-    fontWeight: "500",
-  },
-  infoContainer: {
-    width: "100%",
-    marginBottom: 24,
+    marginBottom: 8,
   },
   infoTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
-    color: "#374151",
-    marginBottom: 16,
-  },
-  infoItem: {
-    flexDirection: "row",
-    marginBottom: 12,
-  },
-  infoIcon: {
-    marginRight: 12,
-    marginTop: 2,
+    color: "#3478F6",
+    marginLeft: 8,
   },
   infoText: {
-    flex: 1,
-    fontSize: 16,
-    color: "#6B7280",
-    lineHeight: 24,
+    fontSize: 14,
+    color: "#3478F6",
+    lineHeight: 20,
   },
-  actionButtons: {
+  stepsContainer: {
     width: "100%",
+    marginBottom: 32,
   },
-  button: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  outlineButton: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-  },
-  buttonText: {
+  stepsTitle: {
     fontSize: 16,
     fontWeight: "bold",
+    color: "#333",
+    marginBottom: 16,
+  },
+  stepItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  stepText: {
+    fontSize: 14,
+    color: "#666",
+    flex: 1,
+    marginLeft: 12,
+    lineHeight: 20,
+  },
+  primaryButton: {
+    backgroundColor: "#3478F6",
+    borderRadius: 12,
+    height: 56,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  primaryButtonText: {
     color: "white",
-    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  secondaryButton: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
+    height: 56,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  secondaryButtonText: {
+    color: "#3478F6",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  reportId: {
+    fontSize: 12,
+    color: "#8E8E93",
   },
 });

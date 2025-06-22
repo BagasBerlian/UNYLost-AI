@@ -2,90 +2,101 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
+  TouchableOpacity,
   ScrollView,
+  TextInput,
   Image,
-  Alert,
-  ActivityIndicator,
   Platform,
-  KeyboardAvoidingView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native";
-import { foundItemAPI } from "../services/api";
-import { categoryAPI } from "../services/api";
-import imageService from "../services/imageService";
+import { categoriesAPI, foundItemsAPI } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function ReportFoundScreen() {
   const navigation = useNavigation();
+  const { user } = useAuth();
+
+  const [loading, setLoading] = useState(false);
+  const [images, setImages] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [formData, setFormData] = useState({
-    itemName: "",
+    item_name: "",
     description: "",
-    categoryId: null,
     location: "",
-    foundDate: new Date(),
-    images: [],
+    category_id: null,
+    found_date: new Date(),
   });
 
-  const [categories, setCategories] = useState([]);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Ambil daftar kategori saat halaman dimuat
   useEffect(() => {
     fetchCategories();
+    requestMediaLibraryPermissions();
   }, []);
 
-  // Function untuk mengambil daftar kategori dari API
+  const requestMediaLibraryPermissions = async () => {
+    if (Platform.OS !== "web") {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Izin Diperlukan",
+          "Maaf, kami membutuhkan izin untuk mengakses galeri foto Anda."
+        );
+      }
+    }
+  };
+
   const fetchCategories = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
-      const response = await categoryAPI.getCategories(token);
-
-      if (response.success) {
-        setCategories(response.data);
+      const response = await categoriesAPI.getAll();
+      if (response.success && response.data.categories) {
+        setCategories(response.data.categories);
       } else {
         console.error("Failed to fetch categories:", response.message);
-        Alert.alert("Error", "Gagal mengambil daftar kategori");
       }
     } catch (error) {
       console.error("Error fetching categories:", error);
-      Alert.alert("Error", "Terjadi kesalahan saat mengambil daftar kategori");
     }
   };
 
-  // Handle input perubahan
   const handleInputChange = (field, value) => {
-    setFormData({
-      ...formData,
-      [field]: value,
-    });
-
-    // Reset error untuk field ini
+    setFormData({ ...formData, [field]: value });
     if (errors[field]) {
-      setErrors({
-        ...errors,
-        [field]: null,
-      });
+      setErrors({ ...errors, [field]: null });
     }
   };
 
-  // Handle pilih gambar dari galeri
-  const handlePickImage = async () => {
+  const handleDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setFormData({ ...formData, found_date: selectedDate });
+    }
+  };
+
+  const pickImage = async () => {
     try {
-      const result = await imageService.pickImage();
-      if (result) {
-        setFormData({
-          ...formData,
-          images: [...formData.images, result],
-        });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        aspect: [4, 3],
+        quality: 0.8,
+        selectionLimit: 5,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // Limit to 5 images max
+        const newImages = [...images, ...result.assets].slice(0, 5);
+        setImages(newImages);
       }
     } catch (error) {
       console.error("Error picking image:", error);
@@ -93,131 +104,91 @@ export default function ReportFoundScreen() {
     }
   };
 
-  // Handle ambil foto dengan kamera
-  const handleTakePhoto = async () => {
-    try {
-      const result = await imageService.takePhoto();
-      if (result) {
-        setFormData({
-          ...formData,
-          images: [...formData.images, result],
-        });
-      }
-    } catch (error) {
-      console.error("Error taking photo:", error);
-      Alert.alert("Error", "Gagal mengambil foto");
-    }
+  const removeImage = (index) => {
+    const newImages = [...images];
+    newImages.splice(index, 1);
+    setImages(newImages);
   };
 
-  // Hapus gambar dari daftar
-  const handleRemoveImage = (index) => {
-    const updatedImages = [...formData.images];
-    updatedImages.splice(index, 1);
-    setFormData({
-      ...formData,
-      images: updatedImages,
-    });
-  };
-
-  // Handle date picker change
-  const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setFormData({
-        ...formData,
-        foundDate: selectedDate,
-      });
-    }
-  };
-
-  // Validate form before submission
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.itemName.trim()) {
-      newErrors.itemName = "Nama barang harus diisi";
+    if (images.length < 2) {
+      newErrors.images = "Minimal 2 foto diperlukan";
     }
 
-    if (!formData.categoryId) {
-      newErrors.categoryId = "Kategori harus dipilih";
+    if (!formData.description || formData.description.trim() === "") {
+      newErrors.description = "Deskripsi barang harus diisi";
     }
 
-    if (!formData.location.trim()) {
+    if (!formData.location || formData.location.trim() === "") {
       newErrors.location = "Lokasi ditemukan harus diisi";
     }
 
-    if (formData.images.length === 0) {
-      newErrors.images = "Minimal satu foto harus diupload";
+    if (!formData.category_id) {
+      newErrors.category_id = "Kategori harus dipilih";
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Submit form
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      Alert.alert("Error", "Harap lengkapi semua field yang diperlukan");
+      return;
+    }
 
-    setIsSubmitting(true);
+    setLoading(true);
 
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const formattedDate = formData.found_date.toISOString().split("T")[0];
 
-      // Prepare form data for API
-      const apiFormData = new FormData();
+      const submitData = {
+        item_name: formData.item_name || "Barang Temuan",
+        description: formData.description,
+        location_found: formData.location,
+        category_id: formData.category_id,
+        found_date: formattedDate,
+      };
 
-      // Add text fields
-      apiFormData.append("item_name", formData.itemName);
-      apiFormData.append("category_id", formData.categoryId);
-      apiFormData.append("description", formData.description || "");
-      apiFormData.append("location", formData.location);
+      const response = await foundItemsAPI.create(submitData, images);
 
-      // Format the date as YYYY-MM-DD
-      const dateString = formData.foundDate.toISOString().split("T")[0];
-      apiFormData.append("found_date", dateString);
-
-      // Add images
-      formData.images.forEach((image, index) => {
-        apiFormData.append("images", {
-          uri: image.uri,
-          type: image.type || "image/jpeg",
-          name: image.name || `image_${index}.jpg`,
-        });
-      });
-
-      const response = await foundItemAPI.createFoundItem(apiFormData, token);
-
-      setIsSubmitting(false);
+      setLoading(false);
 
       if (response.success) {
-        // Navigate to success screen
         navigation.navigate("ReportSuccess", {
           type: "found",
-          itemName: formData.itemName,
-          itemId: response.data.id,
+          itemId: response.data.item.id,
+          reportId: `UNY${Math.floor(1000000 + Math.random() * 9000000)}`,
         });
       } else {
-        Alert.alert(
-          "Error",
-          response.message || "Gagal melaporkan barang temuan"
-        );
+        Alert.alert("Error", response.message || "Gagal mengirim laporan");
       }
     } catch (error) {
-      setIsSubmitting(false);
-      console.error("Error submitting found item:", error);
-      Alert.alert(
-        "Error",
-        "Terjadi kesalahan saat mengirim laporan barang temuan"
-      );
+      setLoading(false);
+      console.error("Error submitting report:", error);
+      Alert.alert("Error", "Terjadi kesalahan saat mengirim laporan");
     }
   };
 
+  // Format date for display
+  const formatDate = (date) => {
+    const d = new Date(date);
+    return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}/${d.getFullYear()} ${d
+      .getHours()
+      .toString()
+      .padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  };
+
+  const selectedCategory = categories.find(
+    (c) => c.id === formData.category_id
+  );
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
-    >
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -226,314 +197,303 @@ export default function ReportFoundScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Laporkan Barang Temuan</Text>
+        <Text style={styles.headerTitle}>LAPORKAN TEMUAN</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Form */}
-        <View style={styles.formContainer}>
-          {/* Nama Barang */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nama Barang*</Text>
-            <TextInput
-              style={[styles.input, errors.itemName && styles.inputError]}
-              placeholder="Contoh: Dompet Hitam, Laptop ASUS, dll"
-              value={formData.itemName}
-              onChangeText={(text) => handleInputChange("itemName", text)}
-            />
-            {errors.itemName && (
-              <Text style={styles.errorText}>{errors.itemName}</Text>
-            )}
-          </View>
+        {/* Info Banner */}
+        <View style={styles.infoBanner}>
+          <Ionicons name="information-circle" size={24} color="#3478F6" />
+          <Text style={styles.infoText}>
+            Silakan isi detail barang yang kamu temukan dengan lengkap untuk
+            memudahkan proses pengembalian.
+          </Text>
+        </View>
 
-          {/* Kategori */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Kategori*</Text>
-            <View style={styles.categoriesContainer}>
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[
-                    styles.categoryItem,
-                    formData.categoryId === category.id &&
-                      styles.categorySelected,
-                  ]}
-                  onPress={() => handleInputChange("categoryId", category.id)}
-                >
-                  <Ionicons
-                    name={category.icon || "help-circle"}
-                    size={24}
-                    color={
-                      formData.categoryId === category.id
-                        ? "#3B82F6"
-                        : "#6B7280"
-                    }
+        {/* Upload Photo Section */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>
+            Unggah Foto Barang <Text style={styles.required}>*</Text>
+            <Text style={styles.sectionSubtitle}> (minimal 2 foto)</Text>
+          </Text>
+
+          <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
+            <Ionicons name="image-outline" size={36} color="#3478F6" />
+            <Text style={styles.uploadText}>Klik untuk memasukkan foto</Text>
+            <Text style={styles.uploadSubtext}>
+              Format: JPG, PNG (Maks. 5MB)
+            </Text>
+          </TouchableOpacity>
+
+          {errors.images && (
+            <Text style={styles.errorText}>{errors.images}</Text>
+          )}
+
+          {/* Image Preview */}
+          {images.length > 0 && (
+            <View style={styles.imagePreviewContainer}>
+              {images.map((image, index) => (
+                <View key={index} style={styles.imagePreview}>
+                  <Image
+                    source={{ uri: image.uri }}
+                    style={styles.previewImage}
                   />
-                  <Text
-                    style={[
-                      styles.categoryText,
-                      formData.categoryId === category.id &&
-                        styles.categoryTextSelected,
-                    ]}
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => removeImage(index)}
                   >
-                    {category.name}
-                  </Text>
-                </TouchableOpacity>
+                    <Ionicons name="close-circle" size={24} color="#FF3B30" />
+                  </TouchableOpacity>
+                </View>
               ))}
             </View>
-            {errors.categoryId && (
-              <Text style={styles.errorText}>{errors.categoryId}</Text>
-            )}
-          </View>
+          )}
 
-          {/* Deskripsi */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Deskripsi</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Deskripsi tambahan tentang barang (warna, ukuran, ciri khusus, dll)"
-              value={formData.description}
-              onChangeText={(text) => handleInputChange("description", text)}
-              multiline
-              numberOfLines={4}
+          <Text style={styles.photoCount}>
+            {images.length} foto dipilih (min. 2)
+          </Text>
+        </View>
+
+        {/* Description Section */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>
+            Deskripsi Detail Barang <Text style={styles.required}>*</Text>
+          </Text>
+          <TextInput
+            style={styles.textArea}
+            placeholder="Jelaskan detail barang seperti warna, merek, kondisi, dll."
+            placeholderTextColor="#A3A3A3"
+            multiline
+            numberOfLines={4}
+            value={formData.description}
+            onChangeText={(text) => handleInputChange("description", text)}
+          />
+          {errors.description && (
+            <Text style={styles.errorText}>{errors.description}</Text>
+          )}
+        </View>
+
+        {/* Location Section */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>
+            Lokasi Ditemukan <Text style={styles.required}>*</Text>
+          </Text>
+          <View style={styles.inputContainer}>
+            <Ionicons
+              name="location-outline"
+              size={24}
+              color="#A3A3A3"
+              style={styles.inputIcon}
             />
-          </View>
-
-          {/* Lokasi Ditemukan */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Lokasi Ditemukan*</Text>
             <TextInput
-              style={[styles.input, errors.location && styles.inputError]}
-              placeholder="Contoh: Perpustakaan UNY, Gedung FMIPA Lantai 2, dll"
+              style={styles.input}
+              placeholder="Contoh: Gedung FMIPA Lantai 2"
+              placeholderTextColor="#A3A3A3"
               value={formData.location}
               onChangeText={(text) => handleInputChange("location", text)}
             />
-            {errors.location && (
-              <Text style={styles.errorText}>{errors.location}</Text>
-            )}
           </View>
-
-          {/* Tanggal Ditemukan */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Tanggal Ditemukan*</Text>
-            <TouchableOpacity
-              style={styles.dateInput}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.dateText}>
-                {formData.foundDate.toLocaleDateString("id-ID", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </Text>
-              <Ionicons name="calendar" size={24} color="#6B7280" />
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={formData.foundDate}
-                mode="date"
-                display="default"
-                onChange={handleDateChange}
-                maximumDate={new Date()}
-              />
-            )}
-          </View>
-
-          {/* Upload Gambar */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Foto Barang*</Text>
-            <View style={styles.uploadContainer}>
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={handlePickImage}
-              >
-                <Ionicons name="images" size={24} color="#3B82F6" />
-                <Text style={styles.uploadButtonText}>Galeri</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={handleTakePhoto}
-              >
-                <Ionicons name="camera" size={24} color="#3B82F6" />
-                <Text style={styles.uploadButtonText}>Kamera</Text>
-              </TouchableOpacity>
-            </View>
-            {errors.images && (
-              <Text style={styles.errorText}>{errors.images}</Text>
-            )}
-            {formData.images.length > 0 && (
-              <View style={styles.imagePreviewContainer}>
-                {formData.images.map((image, index) => (
-                  <View key={index} style={styles.imagePreview}>
-                    <Image
-                      source={{ uri: image.uri }}
-                      style={styles.previewImage}
-                    />
-                    <TouchableOpacity
-                      style={styles.removeImageButton}
-                      onPress={() => handleRemoveImage(index)}
-                    >
-                      <Ionicons name="close-circle" size={24} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* Submit Button */}
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmit}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.submitButtonText}>
-                Laporkan Barang Temuan
-              </Text>
-            )}
-          </TouchableOpacity>
+          {errors.location && (
+            <Text style={styles.errorText}>{errors.location}</Text>
+          )}
         </View>
+
+        {/* Category Section */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>
+            Kategori <Text style={styles.required}>*</Text>
+          </Text>
+          <TouchableOpacity
+            style={styles.pickerContainer}
+            onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+          >
+            <Ionicons
+              name="pricetag-outline"
+              size={24}
+              color="#A3A3A3"
+              style={styles.inputIcon}
+            />
+            <Text
+              style={[
+                styles.pickerText,
+                selectedCategory ? styles.activePickerText : {},
+              ]}
+            >
+              {selectedCategory
+                ? selectedCategory.name
+                : "Pilih kategori barang"}
+            </Text>
+            <Ionicons name="chevron-down" size={24} color="#A3A3A3" />
+          </TouchableOpacity>
+          {errors.category_id && (
+            <Text style={styles.errorText}>{errors.category_id}</Text>
+          )}
+
+          {/* Category Picker Dropdown */}
+          {showCategoryPicker && (
+            <View style={styles.dropdownContainer}>
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    handleInputChange("category_id", category.id);
+                    setShowCategoryPicker(false);
+                  }}
+                >
+                  <Ionicons
+                    name={category.icon || "pricetag-outline"}
+                    size={20}
+                    color="#3478F6"
+                  />
+                  <Text style={styles.dropdownItemText}>{category.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Date & Time Section */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>
+            Tanggal dan Waktu Ditemukan <Text style={styles.required}>*</Text>
+          </Text>
+          <TouchableOpacity
+            style={styles.pickerContainer}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={24}
+              color="#A3A3A3"
+              style={styles.inputIcon}
+            />
+            <Text style={[styles.pickerText, styles.activePickerText]}>
+              {formatDate(formData.found_date)}
+            </Text>
+            <Ionicons name="calendar" size={24} color="#A3A3A3" />
+          </TouchableOpacity>
+
+          {/* Date Picker Modal */}
+          {showDatePicker && (
+            <DateTimePicker
+              value={formData.found_date}
+              mode="datetime"
+              display="default"
+              onChange={handleDateChange}
+              maximumDate={new Date()}
+            />
+          )}
+        </View>
+
+        {/* Submit Button */}
+        <TouchableOpacity
+          style={styles.submitButton}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.submitButtonText}>Kirim Laporan</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Bottom spacing */}
+        <View style={{ height: 40 }} />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#F5F5F7",
   },
   header: {
-    backgroundColor: "#3B82F6",
-    padding: 16,
+    backgroundColor: "#3478F6",
+    paddingTop: 50,
+    paddingBottom: 15,
+    paddingHorizontal: 20,
     flexDirection: "row",
     alignItems: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
   },
   backButton: {
-    marginRight: 16,
+    marginRight: 15,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
     color: "white",
+    fontSize: 20,
+    fontWeight: "bold",
   },
   content: {
     flex: 1,
-  },
-  formContainer: {
     padding: 16,
   },
-  inputGroup: {
-    marginBottom: 20,
+  infoBanner: {
+    backgroundColor: "#E8F1FF",
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 24,
   },
-  label: {
+  infoText: {
+    flex: 1,
+    marginLeft: 10,
+    color: "#3478F6",
+    fontSize: 15,
+  },
+  formSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 8,
-    color: "#374151",
+    color: "#333",
   },
-  input: {
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  inputError: {
-    borderColor: "#EF4444",
-  },
-  errorText: {
-    color: "#EF4444",
+  sectionSubtitle: {
     fontSize: 14,
-    marginTop: 4,
+    fontWeight: "normal",
+    color: "#666",
   },
-  textArea: {
-    height: 100,
-    textAlignVertical: "top",
+  required: {
+    color: "#FF3B30",
   },
-  categoriesContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 8,
-  },
-  categoryItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
+  uploadBox: {
     borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 8,
-    padding: 10,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  categorySelected: {
-    borderColor: "#3B82F6",
-    backgroundColor: "#EBF5FF",
-  },
-  categoryText: {
-    marginLeft: 8,
-    color: "#6B7280",
-  },
-  categoryTextSelected: {
-    color: "#3B82F6",
-    fontWeight: "bold",
-  },
-  dateInput: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 8,
-    padding: 12,
-  },
-  dateText: {
-    fontSize: 16,
-    color: "#374151",
-  },
-  uploadContainer: {
-    flexDirection: "row",
-    marginBottom: 12,
-  },
-  uploadButton: {
-    flexDirection: "row",
+    borderStyle: "dashed",
+    borderColor: "#C7C7CC",
+    borderRadius: 12,
+    padding: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#EBF5FF",
-    borderWidth: 1,
-    borderColor: "#3B82F6",
-    borderRadius: 8,
-    padding: 12,
-    marginRight: 12,
-    flex: 1,
+    backgroundColor: "#F9F9FB",
   },
-  uploadButtonText: {
-    marginLeft: 8,
-    color: "#3B82F6",
-    fontWeight: "bold",
+  uploadText: {
+    fontSize: 16,
+    color: "#3478F6",
+    marginTop: 8,
+    fontWeight: "500",
+  },
+  uploadSubtext: {
+    fontSize: 14,
+    color: "#8E8E93",
+    marginTop: 4,
   },
   imagePreviewContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
+    marginTop: 16,
   },
   imagePreview: {
+    width: 80,
+    height: 80,
+    margin: 4,
+    borderRadius: 8,
     position: "relative",
-    width: 100,
-    height: 100,
-    marginRight: 8,
-    marginBottom: 8,
   },
   previewImage: {
     width: "100%",
@@ -542,22 +502,100 @@ const styles = StyleSheet.create({
   },
   removeImageButton: {
     position: "absolute",
-    top: -10,
-    right: -10,
+    top: -8,
+    right: -8,
     backgroundColor: "white",
     borderRadius: 12,
   },
-  submitButton: {
-    backgroundColor: "#3B82F6",
-    borderRadius: 8,
+  photoCount: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#8E8E93",
+  },
+  textArea: {
+    backgroundColor: "white",
+    borderRadius: 12,
     padding: 16,
+    minHeight: 120,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
+    fontSize: 16,
+    color: "#333",
+    textAlignVertical: "top",
+  },
+  inputContainer: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
-    marginBottom: 40,
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
+    paddingHorizontal: 12,
+  },
+  inputIcon: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    height: 50,
+    fontSize: 16,
+    color: "#333",
+  },
+  pickerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
+    paddingHorizontal: 12,
+    height: 50,
+  },
+  pickerText: {
+    flex: 1,
+    fontSize: 16,
+    color: "#A3A3A3",
+  },
+  activePickerText: {
+    color: "#333",
+  },
+  dropdownContainer: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
+    marginTop: 8,
+    maxHeight: 200,
+    overflow: "scroll",
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F2F2F7",
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: "#333",
+    marginLeft: 8,
+  },
+  errorText: {
+    color: "#FF3B30",
+    fontSize: 14,
+    marginTop: 4,
+  },
+  submitButton: {
+    backgroundColor: "#3478F6",
+    borderRadius: 12,
+    height: 56,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 16,
   },
   submitButtonText: {
     color: "white",
-    fontWeight: "bold",
     fontSize: 16,
+    fontWeight: "bold",
   },
 });

@@ -1,198 +1,150 @@
-import API_CONFIG from "../config/api";
+// Frontend/src/services/api.js
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-class APIService {
-  constructor() {
-    this.baseURL = API_CONFIG.BASE_URL;
-    console.log(`🌐 API Base URL: ${this.baseURL}`);
-  }
+// Base URL untuk API - sesuaikan dengan IP address server Anda
+const API_BASE_URL = "http://192.168.167.105:5000/api";
 
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-
-    // Ensure proper headers for JSON requests
-    const defaultHeaders = {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    };
-
-    const config = {
-      ...options,
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
-    };
-
+// Service utama untuk melakukan request HTTP
+const apiService = {
+  // Fungsi untuk mengambil token dari AsyncStorage
+  async getAuthToken() {
     try {
-      console.log(`🌐 API Request: ${config.method || "GET"} ${url}`);
+      const token = await AsyncStorage.getItem("userToken");
+      console.log("🔑 Auth token:", token ? "Found" : "Not found");
+      return token;
+    } catch (error) {
+      console.error("❌ Error getting auth token:", error);
+      return null;
+    }
+  },
 
-      if (config.body) {
-        try {
-          const parsedBody = JSON.parse(config.body);
-          console.log(`📤 Request data:`, parsedBody);
-        } catch (e) {
-          console.log(`📤 Request body:`, config.body);
+  // Fungsi untuk melakukan request GET
+  async get(endpoint, options = {}) {
+    return this.request("GET", endpoint, null, options);
+  },
+
+  // Fungsi untuk melakukan request POST
+  async post(endpoint, data, options = {}) {
+    return this.request("POST", endpoint, data, options);
+  },
+
+  // Fungsi untuk melakukan request PUT
+  async put(endpoint, data, options = {}) {
+    return this.request("PUT", endpoint, data, options);
+  },
+
+  // Fungsi untuk melakukan request DELETE
+  async delete(endpoint, options = {}) {
+    return this.request("DELETE", endpoint, null, options);
+  },
+
+  // Fungsi utama untuk melakukan request HTTP
+  async request(method, endpoint, data = null, options = {}) {
+    try {
+      const url = `${API_BASE_URL}${endpoint}`;
+      const token = await this.getAuthToken();
+
+      console.log(`🌐 API Request: ${method} ${url}`);
+      if (data) {
+        console.log(`📤 Request data:`, data);
+      }
+
+      // Menentukan header yang sesuai berdasarkan jenis konten
+      let headers = {};
+
+      if (options.headers?.["Content-Type"]) {
+        headers["Content-Type"] = options.headers["Content-Type"];
+      } else if (data instanceof FormData) {
+        // Jika data adalah FormData, tidak perlu set Content-Type (akan diatur otomatis)
+        // headers['Content-Type'] = 'multipart/form-data';
+      } else {
+        headers["Content-Type"] = "application/json";
+      }
+
+      // Tambahkan token jika tersedia
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      // Gabungkan dengan header kustom lainnya
+      headers = {
+        ...headers,
+        ...(options.headers || {}),
+      };
+
+      // Membuat konfigurasi request
+      const config = {
+        method,
+        headers,
+        ...options,
+      };
+
+      // Menambahkan body jika ada data
+      if (data) {
+        if (data instanceof FormData) {
+          config.body = data;
+        } else {
+          config.body = JSON.stringify(data);
         }
       }
 
+      // Melakukan fetch request
       const response = await fetch(url, config);
       console.log(`📥 Response status: ${response.status}`);
 
-      let data;
+      let responseData;
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-        console.log(`📥 Response data:`, data);
+        responseData = await response.json();
       } else {
-        const text = await response.text();
-        console.log(`📥 Response text:`, text);
-        throw new Error(`Server returned non-JSON response: ${text}`);
+        responseData = await response.text();
       }
 
+      console.log(`📥 Response data:`, responseData);
+
+      // Jika respons dari API tidak sukses, throw error
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            `HTTP Error: ${response.status} ${response.statusText}`
+          typeof responseData === "object" && responseData.message
+            ? responseData.message
+            : "API request failed"
         );
       }
 
-      return data;
+      // Kembalikan objek dengan format standar
+      return {
+        success: true,
+        data: responseData,
+        status: response.status,
+      };
     } catch (error) {
-      console.error(`❌ API Error for ${url}:`, error);
+      console.error(`❌ API Error for ${endpoint}:`, error);
 
-      if (
-        error.name === "TypeError" &&
-        error.message.includes("Network request failed")
-      ) {
-        throw new Error(
-          "Tidak dapat terhubung ke server. Pastikan backend berjalan dan URL sudah benar."
-        );
-      } else if (
-        error.name === "TypeError" &&
-        error.message.includes("fetch")
-      ) {
-        throw new Error(
-          "Koneksi internet bermasalah atau server tidak dapat diakses."
-        );
-      } else {
-        throw error;
-      }
+      return {
+        success: false,
+        message:
+          error.message || "Terjadi kesalahan dalam komunikasi dengan server",
+        error,
+      };
     }
-  }
+  },
 
-  // GET request
-  async get(endpoint, token = null) {
-    const headers = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    return this.request(endpoint, {
-      method: "GET",
-      headers,
-    });
-  }
-
-  // POST request with JSON data
-  async post(endpoint, data, token = null) {
-    const headers = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    return this.request(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(data),
-    });
-  }
-
-  // POST request with FormData (for file uploads)
-  async postFormData(endpoint, formData, token = null) {
-    const url = `${this.baseURL}${endpoint}`;
-    const headers = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    try {
-      console.log(`🌐 API FormData Request: POST ${url}`);
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: formData,
-      });
-
-      console.log(`📥 Response status: ${response.status}`);
-
-      const data = await response.json();
-      console.log(`📥 Response data:`, data);
-
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-            `HTTP Error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      return data;
-    } catch (error) {
-      console.error(`❌ API FormData Error for ${url}:`, error);
-      throw error;
-    }
-  }
-
-  // PUT request
-  async put(endpoint, data, token = null) {
-    const headers = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    return this.request(endpoint, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify(data),
-    });
-  }
-
-  // DELETE request
-  async delete(endpoint, token = null) {
-    const headers = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    return this.request(endpoint, {
-      method: "DELETE",
-      headers,
-    });
-  }
-
-  // Test connection method
+  // Fungsi untuk tes koneksi dengan backend
   async testConnection() {
     try {
       const response = await this.get("/health");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
-      return { success: false, error: error.message };
+      return {
+        success: false,
+        message: error.message || "Connection test failed",
+      };
     }
-  }
-
-  // Get token from storage
-  async getToken() {
-    try {
-      return await AsyncStorage.getItem("userToken");
-    } catch (error) {
-      console.error("Error getting token:", error);
-      return null;
-    }
-  }
-}
-
-const apiService = new APIService();
+  },
+};
 
 // Auth API
 export const authAPI = {
@@ -238,37 +190,16 @@ export const authAPI = {
     }
   },
 
-  async verifyWhatsapp(phone) {
-    try {
-      console.log("📱 Verifying WhatsApp:", phone);
-
-      const requestData = { phone };
-      console.log("📤 WhatsApp verification request data:", requestData);
-
-      const response = await apiService.post(
-        "/auth/verify-whatsapp",
-        requestData
-      );
-      console.log("✅ WhatsApp verification successful");
-      return response;
-    } catch (error) {
-      console.error("❌ WhatsApp verification failed:", error);
-      return {
-        success: false,
-        message:
-          error.message ||
-          "Verifikasi WhatsApp gagal. Periksa nomor yang dimasukkan.",
-      };
-    }
-  },
-
   async login(email, password) {
     try {
       console.log("🔐 Logging in user:", email);
       const loginData = { email, password };
       const response = await apiService.post("/auth/login", loginData);
       console.log("✅ Login successful");
-      return response;
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Login failed:", error);
       return {
@@ -285,7 +216,10 @@ export const authAPI = {
       const verifyData = { email, code };
       const response = await apiService.post("/auth/verify-email", verifyData);
       console.log("✅ Email verification successful");
-      return response;
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Email verification failed:", error);
       return {
@@ -297,14 +231,17 @@ export const authAPI = {
     }
   },
 
-  async getProfile(token) {
+  async getProfile() {
     try {
       console.log("👤 Getting user profile");
-      const response = await apiService.get("/auth/me", token);
-      console.log("✅ Profile retrieved successfully");
-      return response;
+      const response = await apiService.get("/auth/profile");
+      console.log("✅ Profile retrieval successful");
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
-      console.error("❌ Get profile failed:", error);
+      console.error("❌ Profile retrieval failed:", error);
       return {
         success: false,
         message: error.message || "Gagal mengambil profil pengguna.",
@@ -312,314 +249,653 @@ export const authAPI = {
     }
   },
 
-  async logout(token) {
+  async resetPassword(email) {
     try {
-      console.log("🚪 Logging out user");
-      // For now, just return success since we don't have a logout endpoint yet
-      return { success: true, message: "Logout berhasil" };
+      console.log("🔑 Requesting password reset for:", email);
+      const response = await apiService.post("/auth/forgot-password", {
+        email,
+      });
+      console.log("✅ Password reset request successful");
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
-      console.error("❌ Logout failed:", error);
+      console.error("❌ Password reset request failed:", error);
       return {
         success: false,
-        message: error.message || "Logout gagal.",
+        message: error.message || "Gagal mengirim permintaan reset password.",
+      };
+    }
+  },
+
+  async confirmResetPassword(token, password) {
+    try {
+      console.log("🔑 Confirming password reset");
+      const response = await apiService.post(`/auth/reset-password/${token}`, {
+        password,
+      });
+      console.log("✅ Password reset successful");
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error("❌ Password reset failed:", error);
+      return {
+        success: false,
+        message: error.message || "Gagal mengatur ulang password.",
       };
     }
   },
 };
 
-// Categories API
-export const categoryAPI = {
-  async getCategories(token) {
+// Dashboard API - API untuk dashboard
+export const dashboardAPI = {
+  async getUserStatistics() {
     try {
-      console.log("📋 Getting categories");
-      const response = await apiService.get("/categories", token);
-      console.log("✅ Categories retrieved successfully");
-      return { success: true, data: response };
+      console.log("📊 Getting user statistics");
+      const response = await apiService.get("/dashboard/user-statistics");
+
+      if (response.success) {
+        console.log("✅ User statistics retrieved successfully");
+        return {
+          success: true,
+          data: response.data, // Pastikan ini memiliki format yang benar
+        };
+      } else {
+        console.error("❌ Get user statistics failed with API error");
+        return {
+          success: false,
+          message: response.message || "Failed to get user statistics",
+        };
+      }
     } catch (error) {
-      console.error("❌ Get categories failed:", error);
+      console.error("❌ Get user statistics failed with exception:", error);
       return {
         success: false,
-        message: error.message || "Gagal mengambil kategori.",
+        message: error.message || "Gagal mendapatkan statistik pengguna",
       };
     }
   },
 };
 
 // Found Items API
-export const foundItemAPI = {
-  async getFoundItems(token, limit = 10, offset = 0) {
+export const foundItemsAPI = {
+  async getAll(limit = 10, offset = 0) {
     try {
       console.log("🔍 Getting found items");
       const response = await apiService.get(
-        `/found-items?limit=${limit}&offset=${offset}`,
-        token
+        `/found-items?limit=${limit}&offset=${offset}`
       );
       console.log("✅ Found items retrieved successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Get found items failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mengambil daftar barang temuan.",
+        message: error.message || "Gagal mendapatkan daftar barang temuan",
       };
     }
   },
 
-  async getMyFoundItems(token, limit = 10, offset = 0) {
+  async getMyItems(limit = 10, offset = 0) {
     try {
       console.log("🔍 Getting my found items");
       const response = await apiService.get(
-        `/found-items/my-items?limit=${limit}&offset=${offset}`,
-        token
+        `/found-items/my-items?limit=${limit}&offset=${offset}`
       );
       console.log("✅ My found items retrieved successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Get my found items failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mengambil daftar barang temuan Anda.",
+        message: error.message || "Gagal mendapatkan daftar barang temuan Anda",
       };
     }
   },
 
-  async getFoundItemById(id, token) {
+  async getMyFoundItems(limit = 10, offset = 0) {
+    console.log("🔍 Getting my found items (alias method)");
+    return this.getMyItems(limit, offset);
+  },
+
+  async getById(id) {
     try {
-      console.log(`🔍 Getting found item with id: ${id}`);
-      const response = await apiService.get(`/found-items/${id}`, token);
-      console.log("✅ Found item retrieved successfully");
-      return { success: true, data: response };
+      console.log(`🔍 Getting found item details for ID: ${id}`);
+      const response = await apiService.get(`/found-items/${id}`);
+      console.log("✅ Found item details retrieved successfully");
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
-      console.error("❌ Get found item failed:", error);
+      console.error("❌ Get found item details failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mengambil detail barang temuan.",
+        message: error.message || "Gagal mendapatkan detail barang temuan",
       };
     }
   },
 
-  async createFoundItem(formData, token) {
+  async create(itemData, images = []) {
     try {
-      console.log("📝 Creating found item");
-      const response = await apiService.postFormData(
-        "/found-items",
-        formData,
-        token
-      );
+      console.log("📦 Creating new found item");
+
+      // Membuat FormData untuk upload gambar
+      const formData = new FormData();
+
+      // Tambahkan data item
+      Object.keys(itemData).forEach((key) => {
+        formData.append(key, itemData[key]);
+      });
+
+      // Tambahkan gambar jika ada
+      if (images && images.length > 0) {
+        images.forEach((image, index) => {
+          const fileType = image.type || "image/jpeg";
+          const fileName = image.fileName || `image-${index}.jpg`;
+
+          formData.append("images", {
+            uri: image.uri,
+            type: fileType,
+            name: fileName,
+          });
+        });
+      }
+
+      const response = await apiService.post("/found-items", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
       console.log("✅ Found item created successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Create found item failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal membuat laporan barang temuan.",
+        message: error.message || "Gagal membuat laporan barang temuan",
       };
     }
   },
 
-  async updateFoundItem(id, data, token) {
+  async update(id, itemData) {
     try {
-      console.log(`📝 Updating found item with id: ${id}`);
-      const response = await apiService.put(`/found-items/${id}`, data, token);
+      console.log(`📝 Updating found item ID: ${id}`);
+      const response = await apiService.put(`/found-items/${id}`, itemData);
       console.log("✅ Found item updated successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Update found item failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mengupdate barang temuan.",
+        message: error.message || "Gagal memperbarui barang temuan",
       };
     }
   },
 
-  async deleteFoundItem(id, token) {
+  async delete(id) {
     try {
-      console.log(`🗑️ Deleting found item with id: ${id}`);
-      const response = await apiService.delete(`/found-items/${id}`, token);
+      console.log(`🗑️ Deleting found item ID: ${id}`);
+      const response = await apiService.delete(`/found-items/${id}`);
       console.log("✅ Found item deleted successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Delete found item failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal menghapus barang temuan.",
+        message: error.message || "Gagal menghapus barang temuan",
       };
     }
   },
 
-  async searchFoundItems(query, token, limit = 10, offset = 0) {
+  async addImages(itemId, images = []) {
     try {
-      console.log(`🔍 Searching found items with query: ${query}`);
-      const response = await apiService.get(
-        `/found-items/search?q=${encodeURIComponent(
-          query
-        )}&limit=${limit}&offset=${offset}`,
-        token
-      );
-      console.log("✅ Found items search successful");
-      return { success: true, data: response };
+      console.log(`🖼️ Adding images to found item ID: ${itemId}`);
+
+      const formData = new FormData();
+
+      // Tambahkan gambar jika ada
+      if (images && images.length > 0) {
+        images.forEach((image, index) => {
+          const fileType = image.type || "image/jpeg";
+          const fileName = image.fileName || `image-${index}.jpg`;
+
+          formData.append("images", {
+            uri: image.uri,
+            type: fileType,
+            name: fileName,
+          });
+        });
+
+        const response = await apiService.post(
+          `/found-items/${itemId}/images`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+
+        console.log("✅ Images added successfully");
+        return {
+          success: true,
+          data: response.data,
+        };
+      } else {
+        return {
+          success: false,
+          message: "Tidak ada gambar yang dipilih",
+        };
+      }
     } catch (error) {
-      console.error("❌ Search found items failed:", error);
+      console.error("❌ Add images failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mencari barang temuan.",
+        message: error.message || "Gagal menambahkan gambar",
+      };
+    }
+  },
+
+  async deleteImage(itemId, imageId) {
+    try {
+      console.log(`🗑️ Deleting image ID: ${imageId} from item ID: ${itemId}`);
+      const response = await apiService.delete(
+        `/found-items/${itemId}/images/${imageId}`
+      );
+      console.log("✅ Image deleted successfully");
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error("❌ Delete image failed:", error);
+      return {
+        success: false,
+        message: error.message || "Gagal menghapus gambar",
+      };
+    }
+  },
+
+  async setPrimaryImage(itemId, imageId) {
+    try {
+      console.log(
+        `🖼️ Setting primary image ID: ${imageId} for item ID: ${itemId}`
+      );
+      const response = await apiService.put(
+        `/found-items/${itemId}/images/${imageId}/primary`
+      );
+      console.log("✅ Primary image set successfully");
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error("❌ Set primary image failed:", error);
+      return {
+        success: false,
+        message: error.message || "Gagal menetapkan gambar utama",
+      };
+    }
+  },
+
+  async findMatches(data) {
+    try {
+      console.log("🔍 Finding matches for found item");
+
+      const formData = new FormData();
+
+      // Tambahkan deskripsi jika ada
+      if (data.description) {
+        formData.append("description", data.description);
+      }
+
+      // Tambahkan gambar jika ada
+      if (data.image) {
+        const fileType = data.image.type || "image/jpeg";
+        const fileName = data.image.fileName || "image.jpg";
+
+        formData.append("file", {
+          uri: data.image.uri,
+          type: fileType,
+          name: fileName,
+        });
+      }
+
+      const response = await apiService.post(
+        "/found-items/find-matches",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      console.log("✅ Matches found successfully");
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error("❌ Find matches failed:", error);
+      return {
+        success: false,
+        message: error.message || "Gagal mencari kecocokan",
       };
     }
   },
 };
 
 // Lost Items API
-export const lostItemAPI = {
-  async getLostItems(token, limit = 10, offset = 0) {
+export const lostItemsAPI = {
+  async getAll(limit = 10, offset = 0) {
     try {
       console.log("🔍 Getting lost items");
       const response = await apiService.get(
-        `/lost-items?limit=${limit}&offset=${offset}`,
-        token
+        `/lost-items?limit=${limit}&offset=${offset}`
       );
       console.log("✅ Lost items retrieved successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Get lost items failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mengambil daftar barang hilang.",
+        message: error.message || "Gagal mendapatkan daftar barang hilang",
       };
     }
   },
 
-  async getMyLostItems(token, limit = 10, offset = 0) {
+  async getMyItems(limit = 10, offset = 0) {
     try {
       console.log("🔍 Getting my lost items");
       const response = await apiService.get(
-        `/lost-items/my-items?limit=${limit}&offset=${offset}`,
-        token
+        `/lost-items/my-items?limit=${limit}&offset=${offset}`
       );
       console.log("✅ My lost items retrieved successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Get my lost items failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mengambil daftar barang hilang Anda.",
+        message: error.message || "Gagal mendapatkan daftar barang hilang Anda",
       };
     }
   },
 
-  async getLostItemById(id, token) {
+  async getMyLostItems(limit = 10, offset = 0) {
+    console.log("🔍 Getting my lost items (alias method)");
+    return this.getMyItems(limit, offset);
+  },
+
+  async getById(id) {
     try {
-      console.log(`🔍 Getting lost item with id: ${id}`);
-      const response = await apiService.get(`/lost-items/${id}`, token);
-      console.log("✅ Lost item retrieved successfully");
-      return { success: true, data: response };
+      console.log(`🔍 Getting lost item details for ID: ${id}`);
+      const response = await apiService.get(`/lost-items/${id}`);
+      console.log("✅ Lost item details retrieved successfully");
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
-      console.error("❌ Get lost item failed:", error);
+      console.error("❌ Get lost item details failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mengambil detail barang hilang.",
+        message: error.message || "Gagal mendapatkan detail barang hilang",
       };
     }
   },
 
-  async createLostItem(formData, token) {
+  async create(itemData, image = null) {
     try {
-      console.log("📝 Creating lost item");
-      const response = await apiService.postFormData(
-        "/lost-items",
-        formData,
-        token
-      );
+      console.log("📦 Creating new lost item");
+
+      // Membuat FormData untuk upload gambar
+      const formData = new FormData();
+
+      // Tambahkan data item
+      Object.keys(itemData).forEach((key) => {
+        formData.append(key, itemData[key]);
+      });
+
+      // Tambahkan gambar jika ada
+      if (image) {
+        const fileType = image.type || "image/jpeg";
+        const fileName = image.fileName || "image.jpg";
+
+        formData.append("image", {
+          uri: image.uri,
+          type: fileType,
+          name: fileName,
+        });
+      }
+
+      const response = await apiService.post("/lost-items", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
       console.log("✅ Lost item created successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Create lost item failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal membuat laporan barang hilang.",
+        message: error.message || "Gagal membuat laporan barang hilang",
       };
     }
   },
 
-  async updateLostItem(id, data, token) {
+  async update(id, itemData) {
     try {
-      console.log(`📝 Updating lost item with id: ${id}`);
-      const response = await apiService.put(`/lost-items/${id}`, data, token);
+      console.log(`📝 Updating lost item ID: ${id}`);
+      const response = await apiService.put(`/lost-items/${id}`, itemData);
       console.log("✅ Lost item updated successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Update lost item failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mengupdate barang hilang.",
+        message: error.message || "Gagal memperbarui barang hilang",
       };
     }
   },
 
-  async deleteLostItem(id, token) {
+  async delete(id) {
     try {
-      console.log(`🗑️ Deleting lost item with id: ${id}`);
-      const response = await apiService.delete(`/lost-items/${id}`, token);
+      console.log(`🗑️ Deleting lost item ID: ${id}`);
+      const response = await apiService.delete(`/lost-items/${id}`);
       console.log("✅ Lost item deleted successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Delete lost item failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal menghapus barang hilang.",
+        message: error.message || "Gagal menghapus barang hilang",
       };
     }
   },
 
-  async findMatches(id, token) {
+  async findMatches(data) {
     try {
-      console.log(`🔍 Finding matches for lost item with id: ${id}`);
-      const response = await apiService.get(
-        `/lost-items/find-matches/${id}`,
-        token
+      console.log("🔍 Finding matches for lost item");
+
+      const formData = new FormData();
+
+      // Tambahkan deskripsi jika ada
+      if (data.description) {
+        formData.append("description", data.description);
+      }
+
+      // Tambahkan gambar jika ada
+      if (data.image) {
+        const fileType = data.image.type || "image/jpeg";
+        const fileName = data.image.fileName || "image.jpg";
+
+        formData.append("file", {
+          uri: data.image.uri,
+          type: fileType,
+          name: fileName,
+        });
+      }
+
+      const response = await apiService.post(
+        "/lost-items/find-matches",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
-      console.log("✅ Found matches successfully");
-      return { success: true, data: response };
+
+      console.log("✅ Matches found successfully");
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Find matches failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mencari barang yang cocok.",
+        message: error.message || "Gagal mencari kecocokan",
+      };
+    }
+  },
+};
+
+// Categories API
+export const categoriesAPI = {
+  async getAll() {
+    try {
+      console.log("📋 Getting categories");
+      const response = await apiService.get("/categories");
+      console.log("✅ Categories retrieved successfully");
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error("❌ Get categories failed:", error);
+      return {
+        success: false,
+        message: error.message || "Gagal mendapatkan daftar kategori",
+      };
+    }
+  },
+
+  async getById(id) {
+    try {
+      console.log(`📋 Getting category ID: ${id}`);
+      const response = await apiService.get(`/categories/${id}`);
+      console.log("✅ Category retrieved successfully");
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error("❌ Get category failed:", error);
+      return {
+        success: false,
+        message: error.message || "Gagal mendapatkan detail kategori",
       };
     }
   },
 };
 
 // Claims API
-export const claimAPI = {
-  async createClaim(data, token) {
-    try {
-      console.log("📝 Creating claim");
-      const response = await apiService.post("/claims", data, token);
-      console.log("✅ Claim created successfully");
-      return { success: true, data: response };
-    } catch (error) {
-      console.error("❌ Create claim failed:", error);
-      return {
-        success: false,
-        message: error.message || "Gagal membuat klaim barang.",
-      };
-    }
-  },
-
-  async getMyClaims(token) {
+export const claimsAPI = {
+  async getMyClaims(limit = 10, offset = 0) {
     try {
       console.log("🔍 Getting my claims");
-      const response = await apiService.get("/claims/my-claims", token);
+      const response = await apiService.get(
+        `/claims/my-claims?limit=${limit}&offset=${offset}`
+      );
       console.log("✅ My claims retrieved successfully");
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error) {
       console.error("❌ Get my claims failed:", error);
       return {
         success: false,
-        message: error.message || "Gagal mengambil daftar klaim Anda.",
+        message: error.message || "Gagal mendapatkan daftar klaim Anda",
+      };
+    }
+  },
+
+  async getById(id) {
+    try {
+      console.log(`🔍 Getting claim details for ID: ${id}`);
+      const response = await apiService.get(`/claims/${id}`);
+      console.log("✅ Claim details retrieved successfully");
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error("❌ Get claim details failed:", error);
+      return {
+        success: false,
+        message: error.message || "Gagal mendapatkan detail klaim",
+      };
+    }
+  },
+
+  async create(claimData) {
+    try {
+      console.log("📦 Creating new claim");
+      const response = await apiService.post("/claims", claimData);
+      console.log("✅ Claim created successfully");
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error("❌ Create claim failed:", error);
+      return {
+        success: false,
+        message: error.message || "Gagal membuat klaim",
       };
     }
   },
 };
 
+// Export API Service untuk digunakan langsung jika diperlukan
 export default apiService;

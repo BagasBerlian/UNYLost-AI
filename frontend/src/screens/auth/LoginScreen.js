@@ -58,7 +58,6 @@ export default function LoginScreen() {
 
       if (result.success) {
         console.log("✅ Login successful - AuthContext will handle navigation");
-        // NO NAVIGATION CALLS HERE - Let AuthContext handle state change
       } else {
         console.log("❌ Login failed:", result.message);
         Alert.alert("Login Gagal", result.message);

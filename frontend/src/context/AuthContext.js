@@ -99,15 +99,44 @@ export function AuthProvider({ children }) {
       const response = await authAPI.login(email, password);
 
       if (response.success) {
-        await AsyncStorage.setItem("userToken", response.data.token);
-        await AsyncStorage.setItem(
-          "userData",
-          JSON.stringify(response.data.user)
-        );
+        console.log("✅ Login response:", response.data);
 
+        if (!response.data.token) {
+          console.error("❌ Token missing in login response");
+          dispatch({ type: "SET_LOADING", payload: false });
+          return {
+            success: false,
+            message: "Token tidak ditemukan dalam respons",
+          };
+        }
+
+        // Simpan token dan data user ke AsyncStorage
+        try {
+          await AsyncStorage.setItem("userToken", response.data.token);
+          await AsyncStorage.setItem(
+            "userData",
+            JSON.stringify(response.data.user)
+          );
+
+          // Verifikasi penyimpanan
+          const savedToken = await AsyncStorage.getItem("userToken");
+          console.log(
+            "✅ Token saved successfully:",
+            savedToken ? "Yes" : "No"
+          );
+        } catch (storageError) {
+          console.error("❌ Error saving to AsyncStorage:", storageError);
+          dispatch({ type: "SET_LOADING", payload: false });
+          return { success: false, message: "Gagal menyimpan data login" };
+        }
+
+        // Update state dengan data login
         dispatch({
           type: "LOGIN_SUCCESS",
-          payload: response.data,
+          payload: {
+            user: response.data.user,
+            token: response.data.token,
+          },
         });
 
         return { success: true };
@@ -116,7 +145,7 @@ export function AuthProvider({ children }) {
         return { success: false, message: response.message };
       }
     } catch (error) {
-      console.log("Login error:", error);
+      console.log("❌ Login error:", error);
       dispatch({ type: "SET_LOADING", payload: false });
       return { success: false, message: "Terjadi kesalahan saat login" };
     }

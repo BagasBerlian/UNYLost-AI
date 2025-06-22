@@ -1,59 +1,78 @@
-// File: frontend/src/components/BottomNavigation.js
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 
 export default function BottomNavigation() {
   const navigation = useNavigation();
+  const route = useRoute();
+  const currentScreen = route.name;
 
-  const navigateTo = (screenName) => {
-    navigation.navigate(screenName);
-  };
+  const navItems = [
+    {
+      name: "Dashboard",
+      icon: "home-outline",
+      activeIcon: "home",
+      label: "Beranda",
+    },
+    {
+      name: "MyItems",
+      icon: "cube-outline",
+      activeIcon: "cube",
+      label: "Item Saya",
+    },
+    {
+      name: "ReportOptions",
+      icon: "add",
+      activeIcon: "add",
+      label: "",
+      isCenter: true,
+    },
+    {
+      name: "Notifications",
+      icon: "notifications-outline",
+      activeIcon: "notifications",
+      label: "Notif",
+    },
+    {
+      name: "Profile",
+      icon: "person-outline",
+      activeIcon: "person",
+      label: "Profil",
+    },
+  ];
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigateTo("Dashboard")}
-      >
-        <Ionicons name="home" size={24} color="#3B82F6" />
-        <Text style={styles.tabLabel}>Beranda</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigateTo("MyItems")}
-      >
-        <Ionicons name="list" size={24} color="#6B7280" />
-        <Text style={styles.tabLabel}>Barang Saya</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.mainButton}
-        onPress={() => {
-          // Tampilkan menu untuk memilih jenis laporan
-          navigation.navigate("ReportOptions");
-        }}
-      >
-        <Ionicons name="add-circle" size={56} color="#3B82F6" />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigateTo("Notifications")}
-      >
-        <Ionicons name="notifications" size={24} color="#6B7280" />
-        <Text style={styles.tabLabel}>Notifikasi</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigateTo("Profile")}
-      >
-        <Ionicons name="person" size={24} color="#6B7280" />
-        <Text style={styles.tabLabel}>Profil</Text>
-      </TouchableOpacity>
+      {navItems.map((item, index) => (
+        <TouchableOpacity
+          key={index}
+          style={[styles.navItem, item.isCenter && styles.centerButton]}
+          onPress={() => navigation.navigate(item.name)}
+        >
+          {item.isCenter ? (
+            <View style={styles.addButtonInner}>
+              <Ionicons name={item.icon} size={24} color="#FFF" />
+            </View>
+          ) : (
+            <>
+              <Ionicons
+                name={currentScreen === item.name ? item.activeIcon : item.icon}
+                size={24}
+                color={currentScreen === item.name ? "#3478F6" : "#888"}
+              />
+              <Text
+                style={[
+                  styles.navLabel,
+                  currentScreen === item.name && styles.activeNavLabel,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      ))}
     </View>
   );
 }
@@ -61,34 +80,42 @@ export default function BottomNavigation() {
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    backgroundColor: "white",
-    paddingTop: 8,
-    paddingBottom: 24,
+    height: 60,
+    backgroundColor: "#FFF",
     borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderTopColor: "#EAEAEA",
+    justifyContent: "space-around",
+    alignItems: "center",
   },
-  tabItem: {
+  navItem: {
     flex: 1,
-    alignItems: "center",
     justifyContent: "center",
-  },
-  tabLabel: {
-    fontSize: 12,
-    marginTop: 4,
-    color: "#6B7280",
-  },
-  mainButton: {
     alignItems: "center",
-    justifyContent: "center",
+    height: "100%",
+  },
+  centerButton: {
+    justifyContent: "flex-start",
     marginTop: -30,
+  },
+  addButtonInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#3478F6",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  navLabel: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 4,
+  },
+  activeNavLabel: {
+    color: "#3478F6",
   },
 });

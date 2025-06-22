@@ -1,41 +1,32 @@
 const jwt = require("jsonwebtoken");
-const db = require("../config/database");
 
 module.exports = (req, res, next) => {
+  // Ambil token dari header
+  const authHeader = req.header("Authorization");
+  console.log("Auth Header:", authHeader);
+
+  if (!authHeader) {
+    return res.status(401).json({ message: "No token, authorization denied" });
+  }
+
+  // Format header: "Bearer [token]"
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.substring(7, authHeader.length)
+    : authHeader;
+
+  if (!token) {
+    return res.status(401).json({ message: "No token, authorization denied" });
+  }
+
   try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
+    // Verifikasi token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!token) {
-      return res
-        .status(401)
-        .json({ message: "No token, authorization denied" });
-    }
-
-    jwt.verify(token, process.env.JWT_SECRET, (error, decoded) => {
-      if (error) {
-        return res.status(401).json({ message: "Token is not valid" });
-      }
-
-      db.query(
-        "SELECT id, email, full_name, role FROM users WHERE id = ?",
-        [decoded.id],
-        (error, results) => {
-          if (error) {
-            console.error("Database error:", error);
-            return res.status(500).json({ message: "Server error" });
-          }
-
-          if (results.length === 0) {
-            return res.status(401).json({ message: "User not found" });
-          }
-
-          req.user = results[0];
-          next();
-        }
-      );
-    });
+    // Tambahkan user ke request
+    req.user = decoded;
+    next();
   } catch (error) {
-    console.error("Auth middleware error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Token verification error:", error);
+    res.status(401).json({ message: "Token is not valid" });
   }
 };

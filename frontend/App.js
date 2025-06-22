@@ -71,6 +71,8 @@ function AppStack() {
 function AppNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  console.log("Auth State:", { isAuthenticated, isLoading });
+
   // Show splash only during initial loading
   if (isLoading) {
     return <SplashScreen />;

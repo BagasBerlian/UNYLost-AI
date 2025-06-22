@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const authRoutes = require("./routes/auth");
 const adminRoutes = require("./routes/adminRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 const categoryRoutes = require("./routes/categories");
 const foundItemRoutes = require("./routes/foundItems");
 const lostItemRoutes = require("./routes/lostItems");
@@ -48,6 +49,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/found-items", foundItemRoutes);
 app.use("/api/lost-items", lostItemRoutes);
