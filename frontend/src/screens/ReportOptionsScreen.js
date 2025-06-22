@@ -1,5 +1,4 @@
-// File: frontend/src/screens/ReportOptionsScreen.js
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,75 +6,182 @@ import {
   TouchableOpacity,
   Modal,
   Animated,
+  Dimensions,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
 export default function ReportOptionsScreen({ visible, onClose }) {
   const navigation = useNavigation();
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnimLost = useRef(new Animated.Value(0.9)).current;
+  const scaleAnimFound = useRef(new Animated.Value(0.9)).current;
+
+  // Fungsi untuk menangani animasi keluar
+  const handleClose = () => {
+    // Animasi penutupan
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnimLost, {
+        toValue: 0.9,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnimFound, {
+        toValue: 0.9,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Panggil onClose setelah animasi selesai
+      onClose();
+    });
+  };
+
+  useEffect(() => {
+    if (visible) {
+      // Reset animasi saat modal muncul
+      slideAnim.setValue(0);
+      fadeAnim.setValue(0);
+      scaleAnimLost.setValue(0.9);
+      scaleAnimFound.setValue(0.9);
+
+      // Mulai animasi
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(150),
+          Animated.timing(scaleAnimLost, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.delay(250),
+          Animated.timing(scaleAnimFound, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [visible, slideAnim, fadeAnim, scaleAnimLost, scaleAnimFound]);
 
   const handleReportLost = () => {
-    onClose();
-    navigation.navigate("ReportLost");
+    handleClose();
+    // Gunakan timeout agar navigasi terjadi setelah modal tertutup
+    setTimeout(() => {
+      navigation.navigate("ReportLost");
+    }, 300);
   };
 
   const handleReportFound = () => {
-    onClose();
-    navigation.navigate("ReportFound");
+    handleClose();
+    setTimeout(() => {
+      navigation.navigate("ReportFound");
+    }, 300);
   };
+
+  const { height } = Dimensions.get("window");
+  const translateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [height, 0],
+  });
 
   return (
     <Modal
       transparent
       visible={visible}
-      animationType="fade"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Laporkan Barang</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.optionButton, styles.lostButton]}
-            onPress={handleReportLost}
-          >
-            <View style={styles.iconContainer}>
-              <Ionicons name="search" size={32} color="#FFFFFF" />
-            </View>
-            <View style={styles.optionTextContainer}>
-              <Text style={styles.optionTitle}>Laporkan Barang Hilang</Text>
-              <Text style={styles.optionDescription}>
-                Kehilangan barang? Laporkan agar orang lain dapat membantu
-                menemukan
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#EF4444" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.optionButton, styles.foundButton]}
-            onPress={handleReportFound}
-          >
-            <View
-              style={[styles.iconContainer, { backgroundColor: "#3B82F6" }]}
+      <TouchableWithoutFeedback onPress={handleClose}>
+        <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
+          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+            <Animated.View
+              style={[styles.modalContainer, { transform: [{ translateY }] }]}
             >
-              <Ionicons name="basket" size={32} color="#FFFFFF" />
-            </View>
-            <View style={styles.optionTextContainer}>
-              <Text style={styles.optionTitle}>Laporkan Barang Temuan</Text>
-              <Text style={styles.optionDescription}>
-                Menemukan barang? Laporkan agar pemiliknya dapat mengklaim
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#3B82F6" />
-          </TouchableOpacity>
-        </View>
-      </View>
+              <View style={styles.header}>
+                <Text style={styles.title}>Laporkan Barang</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={handleClose}
+                >
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <Animated.View style={{ transform: [{ scale: scaleAnimLost }] }}>
+                <TouchableOpacity
+                  style={[styles.optionButton, styles.lostButton]}
+                  onPress={handleReportLost}
+                >
+                  <View style={styles.iconContainer}>
+                    <Ionicons name="search" size={32} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.optionTextContainer}>
+                    <Text style={styles.optionTitle}>
+                      Laporkan Barang Hilang
+                    </Text>
+                    <Text style={styles.optionDescription}>
+                      Kehilangan barang? Laporkan agar orang lain dapat membantu
+                      menemukan
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#EF4444" />
+                </TouchableOpacity>
+              </Animated.View>
+
+              <Animated.View style={{ transform: [{ scale: scaleAnimFound }] }}>
+                <TouchableOpacity
+                  style={[styles.optionButton, styles.foundButton]}
+                  onPress={handleReportFound}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      { backgroundColor: "#3B82F6" },
+                    ]}
+                  >
+                    <Ionicons name="basket" size={32} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.optionTextContainer}>
+                    <Text style={styles.optionTitle}>
+                      Laporkan Barang Temuan
+                    </Text>
+                    <Text style={styles.optionDescription}>
+                      Menemukan barang? Laporkan agar pemiliknya dapat mengklaim
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#3B82F6" />
+                </TouchableOpacity>
+              </Animated.View>
+            </Animated.View>
+          </TouchableWithoutFeedback>
+        </Animated.View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
@@ -91,6 +197,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    paddingBottom: 30,
   },
   header: {
     flexDirection: "row",
@@ -113,6 +220,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
     borderWidth: 1,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   lostButton: {
     borderColor: "#FECACA",

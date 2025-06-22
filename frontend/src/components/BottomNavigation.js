@@ -1,12 +1,27 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import ReportOptionsScreen from "../screens/ReportOptionsScreen";
 
 export default function BottomNavigation() {
   const navigation = useNavigation();
   const route = useRoute();
   const currentScreen = route.name;
+
+  const [showReportOptions, setShowReportOptions] = useState(false);
+
+  const handleNavigation = (item) => {
+    if (item.name === "ReportOptions") {
+      setShowReportOptions(true);
+    } else {
+      navigation.navigate(item.name);
+    }
+  };
+
+  const handleCloseReportOptions = () => {
+    setShowReportOptions(false);
+  };
 
   const navItems = [
     {
@@ -48,7 +63,7 @@ export default function BottomNavigation() {
         <TouchableOpacity
           key={index}
           style={[styles.navItem, item.isCenter && styles.centerButton]}
-          onPress={() => navigation.navigate(item.name)}
+          onPress={() => handleNavigation(item)}
         >
           {item.isCenter ? (
             <View style={styles.addButtonInner}>
@@ -73,6 +88,10 @@ export default function BottomNavigation() {
           )}
         </TouchableOpacity>
       ))}
+      <ReportOptionsScreen
+        visible={showReportOptions}
+        onClose={handleCloseReportOptions}
+      />
     </View>
   );
 }
@@ -80,7 +99,7 @@ export default function BottomNavigation() {
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    height: 60,
+    height: 80,
     backgroundColor: "#FFF",
     borderTopWidth: 1,
     borderTopColor: "#EAEAEA",

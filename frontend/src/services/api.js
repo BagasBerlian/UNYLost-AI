@@ -1,4 +1,4 @@
-// Frontend/src/services/api.js
+import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Base URL untuk API - sesuaikan dengan IP address server Anda
@@ -322,23 +322,14 @@ export const dashboardAPI = {
 
 // Found Items API
 export const foundItemsAPI = {
-  async getAll(limit = 10, offset = 0) {
+  getAll: async () => {
     try {
-      console.log("🔍 Getting found items");
-      const response = await apiService.get(
-        `/found-items?limit=${limit}&offset=${offset}`
-      );
-      console.log("✅ Found items retrieved successfully");
-      return {
-        success: true,
-        data: response.data,
-      };
+      const headers = await getAuthHeader();
+      const response = await axios.get(`${API_URL}/found-items`, { headers });
+      return { success: true, data: response.data };
     } catch (error) {
-      console.error("❌ Get found items failed:", error);
-      return {
-        success: false,
-        message: error.message || "Gagal mendapatkan daftar barang temuan",
-      };
+      console.error("Error fetching found items:", error);
+      return { success: false, message: error.message };
     }
   },
 
@@ -367,66 +358,48 @@ export const foundItemsAPI = {
     return this.getMyItems(limit, offset);
   },
 
-  async getById(id) {
+  getById: async (id) => {
     try {
-      console.log(`🔍 Getting found item details for ID: ${id}`);
-      const response = await apiService.get(`/found-items/${id}`);
-      console.log("✅ Found item details retrieved successfully");
-      return {
-        success: true,
-        data: response.data,
-      };
+      const headers = await getAuthHeader();
+      const response = await axios.get(`${API_URL}/found-items/${id}`, {
+        headers,
+      });
+      return { success: true, data: response.data };
     } catch (error) {
-      console.error("❌ Get found item details failed:", error);
-      return {
-        success: false,
-        message: error.message || "Gagal mendapatkan detail barang temuan",
-      };
+      console.error(`Error fetching found item ${id}:`, error);
+      return { success: false, message: error.message };
     }
   },
 
-  async create(itemData, images = []) {
+  createItem: async (formData) => {
     try {
-      console.log("📦 Creating new found item");
+      const token = await AsyncStorage.getItem("userToken");
+      console.log("Token:", token ? "Available" : "Not available");
+      console.log("API URL:", `${API_URL}/found-items`);
 
-      // Membuat FormData untuk upload gambar
-      const formData = new FormData();
-
-      // Tambahkan data item
-      Object.keys(itemData).forEach((key) => {
-        formData.append(key, itemData[key]);
-      });
-
-      // Tambahkan gambar jika ada
-      if (images && images.length > 0) {
-        images.forEach((image, index) => {
-          const fileType = image.type || "image/jpeg";
-          const fileName = image.fileName || `image-${index}.jpg`;
-
-          formData.append("images", {
-            uri: image.uri,
-            type: fileType,
-            name: fileName,
-          });
-        });
-      }
-
-      const response = await apiService.post("/found-items", formData, {
+      const response = await axios.post(`${API_URL}/found-items`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
         },
       });
 
-      console.log("✅ Found item created successfully");
-      return {
-        success: true,
-        data: response.data,
-      };
+      return { success: true, data: response.data };
     } catch (error) {
-      console.error("❌ Create found item failed:", error);
+      console.error("API Error - createItem:", error);
+
+      if (error.response) {
+        console.log(
+          "Server response:",
+          error.response.status,
+          error.response.data
+        );
+      }
+
       return {
         success: false,
-        message: error.message || "Gagal membuat laporan barang temuan",
+        message:
+          error.response?.data?.message || "Terjadi kesalahan pada server",
       };
     }
   },

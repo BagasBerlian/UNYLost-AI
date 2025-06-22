@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -87,15 +88,33 @@ export default function ReportLostScreen() {
 
   const pickImage = async () => {
     try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== "granted") {
+        Alert.alert(
+          "Izin Diperlukan",
+          "Aplikasi membutuhkan izin untuk mengakses galeri foto Anda."
+        );
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
+        mediaTypes: ["images"],
+        allowsEditing: false,
+        allowsMultipleSelection: true,
         aspect: [4, 3],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImage(result.assets[0]);
+        // Limit to 5 images max
+        const newImages = [...images, ...result.assets].slice(0, 5);
+        setImages(newImages);
+
+        // Tambahkan log untuk verifikasi
+        console.log("Gambar terpilih:", JSON.stringify(result.assets));
+        console.log("Total gambar saat ini:", newImages.length);
       }
     } catch (error) {
       console.error("Error picking image:", error);
@@ -187,261 +206,316 @@ export default function ReportLostScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>LAPORKAN KEHILANGAN</Text>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Info Banner */}
-        <View style={styles.infoBanner}>
-          <Ionicons name="information-circle" size={24} color="#3478F6" />
-          <Text style={styles.infoText}>
-            Silakan isi detail barang yang kamu hilangkan dengan lengkap untuk
-            memudahkan proses pencarian.
-          </Text>
-        </View>
-
-        {/* Upload Photo Section */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>
-            Unggah Foto Barang <Text style={styles.optional}>(Opsional)</Text>
-          </Text>
-
-          <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
-            <Ionicons name="image-outline" size={36} color="#3478F6" />
-            <Text style={styles.uploadText}>Klik untuk memasukkan foto</Text>
-            <Text style={styles.uploadSubtext}>
-              Format: JPG, PNG (Maks. 5MB)
-            </Text>
-          </TouchableOpacity>
-
-          {/* Image Preview */}
-          {image && (
-            <View style={styles.imagePreviewContainer}>
-              <View style={styles.imagePreview}>
-                <Image
-                  source={{ uri: image.uri }}
-                  style={styles.previewImage}
-                />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={removeImage}
-                >
-                  <Ionicons name="close-circle" size={24} color="#FF3B30" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          <Text style={styles.photoCount}>
-            {image ? "1" : "0"} foto dipilih
-          </Text>
-        </View>
-
-        {/* Description Section */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>
-            Deskripsi Detail Barang <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.textArea}
-            placeholder="Jelaskan detail barang seperti warna, merek, kondisi, dll."
-            placeholderTextColor="#A3A3A3"
-            multiline
-            numberOfLines={4}
-            value={formData.description}
-            onChangeText={(text) => handleInputChange("description", text)}
-          />
-          {errors.description && (
-            <Text style={styles.errorText}>{errors.description}</Text>
-          )}
-        </View>
-
-        {/* Location Section */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>
-            Lokasi Terakhir <Text style={styles.required}>*</Text>
-          </Text>
-          <View style={styles.inputContainer}>
-            <Ionicons
-              name="location-outline"
-              size={24}
-              color="#A3A3A3"
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Contoh: Gedung FMIPA Lantai 2"
-              placeholderTextColor="#A3A3A3"
-              value={formData.last_seen_location}
-              onChangeText={(text) =>
-                handleInputChange("last_seen_location", text)
-              }
-            />
-          </View>
-          {errors.last_seen_location && (
-            <Text style={styles.errorText}>{errors.last_seen_location}</Text>
-          )}
-        </View>
-
-        {/* Category Section */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>
-            Kategori <Text style={styles.required}>*</Text>
-          </Text>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
           <TouchableOpacity
-            style={styles.pickerContainer}
-            onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
           >
-            <Ionicons
-              name="pricetag-outline"
-              size={24}
-              color="#A3A3A3"
-              style={styles.inputIcon}
-            />
-            <Text
-              style={[
-                styles.pickerText,
-                selectedCategory ? styles.activePickerText : {},
-              ]}
-            >
-              {selectedCategory
-                ? selectedCategory.name
-                : "Pilih kategori barang"}
-            </Text>
-            <Ionicons name="chevron-down" size={24} color="#A3A3A3" />
+            <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          {errors.category_id && (
-            <Text style={styles.errorText}>{errors.category_id}</Text>
-          )}
+          <Text style={styles.headerTitle}>LAPORKAN KEHILANGAN</Text>
+        </View>
 
-          {/* Category Picker Dropdown */}
-          {showCategoryPicker && (
-            <View style={styles.dropdownContainer}>
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    handleInputChange("category_id", category.id);
-                    setShowCategoryPicker(false);
-                  }}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Info Banner */}
+          <View style={styles.infoBanner}>
+            <Ionicons name="information-circle" size={24} color="#3478F6" />
+            <Text style={styles.infoText}>
+              Silakan isi detail barang yang kamu hilangkan dengan lengkap untuk
+              memudahkan proses pencarian.
+            </Text>
+          </View>
+
+          {/* Upload Photo Section */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>
+              Unggah Foto Barang <Text style={styles.optional}>(Opsional)</Text>
+            </Text>
+
+            {/* Bagian preview gambar */}
+            <View style={styles.imagePreviewSection}>
+              <Text style={styles.sectionTitle}>Foto Barang</Text>
+
+              <TouchableOpacity
+                style={styles.imagePickerButton}
+                onPress={pickImage}
+              >
+                <Ionicons name="camera-outline" size={24} color="#3478F6" />
+                <Text style={styles.imagePickerText}>
+                  {images.length > 0 ? "Tambah Foto" : "Pilih Foto"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Preview gambar yang dipilih */}
+              {images.length > 0 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.previewContainer}
                 >
-                  <Ionicons
-                    name={category.icon || "pricetag-outline"}
-                    size={20}
-                    color="#3478F6"
+                  {images.map((image, index) => (
+                    <View key={index} style={styles.previewImageContainer}>
+                      <Image
+                        source={{ uri: image.uri }}
+                        style={styles.previewImage}
+                      />
+                      <TouchableOpacity
+                        style={styles.removeImageButton}
+                        onPress={() => {
+                          const newImages = [...images];
+                          newImages.splice(index, 1);
+                          setImages(newImages);
+                        }}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={24}
+                          color="#FF3B30"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
+              <Ionicons name="image-outline" size={36} color="#3478F6" />
+              <Text style={styles.uploadText}>Klik untuk memasukkan foto</Text>
+              <Text style={styles.uploadSubtext}>
+                Format: JPG, PNG (Maks. 5MB)
+              </Text>
+            </TouchableOpacity>
+
+            {/* Image Preview */}
+            {image && (
+              <View style={styles.imagePreviewContainer}>
+                <View style={styles.imagePreview}>
+                  <Image
+                    source={{ uri: image.uri }}
+                    style={styles.previewImage}
                   />
-                  <Text style={styles.dropdownItemText}>{category.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={removeImage}
+                  >
+                    <Ionicons name="close-circle" size={24} color="#FF3B30" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
-        {/* Date Section */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>
-            Tanggal Hilang <Text style={styles.required}>*</Text>
-          </Text>
-          <TouchableOpacity
-            style={styles.pickerContainer}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Ionicons
-              name="calendar-outline"
-              size={24}
-              color="#A3A3A3"
-              style={styles.inputIcon}
-            />
-            <Text style={[styles.pickerText, styles.activePickerText]}>
-              {formatDate(formData.lost_date)}
+            <Text style={styles.photoCount}>
+              {image ? "1" : "0"} foto dipilih
             </Text>
-            <Ionicons name="calendar" size={24} color="#A3A3A3" />
+          </View>
+
+          {/* Description Section */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>
+              Deskripsi Detail Barang <Text style={styles.required}>*</Text>
+            </Text>
+            <TextInput
+              style={styles.textArea}
+              placeholder="Jelaskan detail barang seperti warna, merek, kondisi, dll."
+              placeholderTextColor="#A3A3A3"
+              multiline
+              numberOfLines={4}
+              value={formData.description}
+              onChangeText={(text) => handleInputChange("description", text)}
+            />
+            {errors.description && (
+              <Text style={styles.errorText}>{errors.description}</Text>
+            )}
+          </View>
+
+          {/* Location Section */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>
+              Lokasi Terakhir <Text style={styles.required}>*</Text>
+            </Text>
+            <View style={styles.inputContainer}>
+              <Ionicons
+                name="location-outline"
+                size={24}
+                color="#A3A3A3"
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Contoh: Gedung FMIPA Lantai 2"
+                placeholderTextColor="#A3A3A3"
+                value={formData.last_seen_location}
+                onChangeText={(text) =>
+                  handleInputChange("last_seen_location", text)
+                }
+              />
+            </View>
+            {errors.last_seen_location && (
+              <Text style={styles.errorText}>{errors.last_seen_location}</Text>
+            )}
+          </View>
+
+          {/* Category Section */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>
+              Kategori <Text style={styles.required}>*</Text>
+            </Text>
+            <TouchableOpacity
+              style={styles.pickerContainer}
+              onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+            >
+              <Ionicons
+                name="pricetag-outline"
+                size={24}
+                color="#A3A3A3"
+                style={styles.inputIcon}
+              />
+              <Text
+                style={[
+                  styles.pickerText,
+                  selectedCategory ? styles.activePickerText : {},
+                ]}
+              >
+                {selectedCategory
+                  ? selectedCategory.name
+                  : "Pilih kategori barang"}
+              </Text>
+              <Ionicons name="chevron-down" size={24} color="#A3A3A3" />
+            </TouchableOpacity>
+            {errors.category_id && (
+              <Text style={styles.errorText}>{errors.category_id}</Text>
+            )}
+
+            {/* Category Picker Dropdown */}
+            {showCategoryPicker && (
+              <View style={styles.dropdownContainer}>
+                {categories.map((category) => (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      handleInputChange("category_id", category.id);
+                      setShowCategoryPicker(false);
+                    }}
+                  >
+                    <Ionicons
+                      name={category.icon || "pricetag-outline"}
+                      size={20}
+                      color="#3478F6"
+                    />
+                    <Text style={styles.dropdownItemText}>{category.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Date Section */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>
+              Tanggal Hilang <Text style={styles.required}>*</Text>
+            </Text>
+            <TouchableOpacity
+              style={styles.pickerContainer}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={24}
+                color="#A3A3A3"
+                style={styles.inputIcon}
+              />
+              <Text style={[styles.pickerText, styles.activePickerText]}>
+                {formatDate(formData.lost_date)}
+              </Text>
+              <Ionicons name="calendar" size={24} color="#A3A3A3" />
+            </TouchableOpacity>
+
+            {/* Date Picker Modal */}
+            {showDatePicker && (
+              <DateTimePicker
+                value={formData.lost_date}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+              />
+            )}
+          </View>
+
+          {/* Reward Section */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>
+              Hadiah <Text style={styles.optional}>(Opsional)</Text>
+            </Text>
+
+            <View style={styles.rewardContainer}>
+              <Text style={styles.rewardValue}>Rp. 0</Text>
+              <Slider
+                style={styles.slider}
+                minimumValue={0}
+                maximumValue={500000}
+                step={10000}
+                value={formData.reward}
+                onValueChange={(value) => handleInputChange("reward", value)}
+                minimumTrackTintColor="#3478F6"
+                maximumTrackTintColor="#E5E5EA"
+                thumbTintColor="#3478F6"
+              />
+              <Text style={styles.rewardValue}>Rp. 500.000</Text>
+            </View>
+
+            <View style={styles.rewardInputContainer}>
+              <Text style={styles.rewardLabel}>hadiah:</Text>
+              <TextInput
+                style={styles.rewardInput}
+                placeholder="Rp. 0"
+                placeholderTextColor="#A3A3A3"
+                keyboardType="number-pad"
+                value={
+                  formData.reward > 0 ? formatCurrency(formData.reward) : ""
+                }
+                onChangeText={(text) => {
+                  // Extract numbers only
+                  const numericValue =
+                    parseInt(text.replace(/[^0-9]/g, "")) || 0;
+                  if (numericValue <= 500000) {
+                    handleInputChange("reward", numericValue);
+                  }
+                }}
+              />
+            </View>
+
+            <Text style={styles.rewardHint}>
+              Tambahkan reward untuk meningkatkan peluang barang ditemukan
+            </Text>
+          </View>
+
+          {/* Submit Button */}
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.submitButtonText}>Kirim Laporan</Text>
+            )}
           </TouchableOpacity>
 
-          {/* Date Picker Modal */}
-          {showDatePicker && (
-            <DateTimePicker
-              value={formData.lost_date}
-              mode="date"
-              display="default"
-              onChange={handleDateChange}
-              maximumDate={new Date()}
-            />
-          )}
-        </View>
-
-        {/* Reward Section */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>
-            Hadiah <Text style={styles.optional}>(Opsional)</Text>
-          </Text>
-
-          <View style={styles.rewardContainer}>
-            <Text style={styles.rewardValue}>Rp. 0</Text>
-            <Slider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={500000}
-              step={10000}
-              value={formData.reward}
-              onValueChange={(value) => handleInputChange("reward", value)}
-              minimumTrackTintColor="#3478F6"
-              maximumTrackTintColor="#E5E5EA"
-              thumbTintColor="#3478F6"
-            />
-            <Text style={styles.rewardValue}>Rp. 500.000</Text>
-          </View>
-
-          <View style={styles.rewardInputContainer}>
-            <Text style={styles.rewardLabel}>hadiah:</Text>
-            <TextInput
-              style={styles.rewardInput}
-              placeholder="Rp. 0"
-              placeholderTextColor="#A3A3A3"
-              keyboardType="number-pad"
-              value={formData.reward > 0 ? formatCurrency(formData.reward) : ""}
-              onChangeText={(text) => {
-                // Extract numbers only
-                const numericValue = parseInt(text.replace(/[^0-9]/g, "")) || 0;
-                if (numericValue <= 500000) {
-                  handleInputChange("reward", numericValue);
-                }
-              }}
-            />
-          </View>
-
-          <Text style={styles.rewardHint}>
-            Tambahkan reward untuk meningkatkan peluang barang ditemukan
-          </Text>
-        </View>
-
-        {/* Submit Button */}
-        <TouchableOpacity
-          style={styles.submitButton}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.submitButtonText}>Kirim Laporan</Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Bottom spacing */}
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </View>
+          {/* Bottom spacing */}
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 

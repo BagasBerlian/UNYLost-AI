@@ -23,7 +23,13 @@ const app = express();
 //   console.error("Error during model initialization:", error);
 // }
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "*", // Untuk pengembangan
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static("uploads"));
