@@ -91,31 +91,34 @@ export default function RegisterScreen() {
     if (!formData.whatsappNumber) {
       setErrors((prev) => ({
         ...prev,
-        whatsappNumber: "Nomor WhatsApp harus diisi",
+        whatsappNumber: "Nomor WhatsApp harus diisi terlebih dahulu.",
       }));
       return;
     }
 
+    // Tampilkan loading dan nonaktifkan tombol
     setIsVerifyingWhatsapp(true);
-    setVerificationInProgress(true);
 
     try {
-      console.log("Verifying WhatsApp:", formData.whatsappNumber);
-
+      console.log("Memverifikasi WhatsApp:", formData.whatsappNumber);
       const response = await authAPI.verifyWhatsapp(formData.whatsappNumber);
 
       if (response.success) {
         setWhatsappCodeSent(true);
-        // Jika dalam mode development, auto-fill kode untuk kemudahan testing
+        // Jika dalam mode development, backend akan mengirim kode untuk diisi otomatis
         if (response.code) {
           setWhatsappVerificationCode(response.code);
         }
         Alert.alert(
-          "Kode Verifikasi Terkirim",
-          "Kode verifikasi telah dikirim ke WhatsApp Anda."
+          "Kode Terkirim",
+          "Kode verifikasi telah dikirim ke WhatsApp Anda. Silakan periksa."
         );
       } else {
-        Alert.alert("Verifikasi Gagal", response.message);
+        // Tampilkan pesan error dari backend/Fonnte
+        Alert.alert(
+          "Verifikasi Gagal",
+          response.message || "Pastikan nomor WhatsApp Anda aktif dan benar."
+        );
       }
     } catch (error) {
       console.error("WhatsApp verification error:", error);
@@ -124,8 +127,8 @@ export default function RegisterScreen() {
         "Terjadi kesalahan saat verifikasi. Coba lagi nanti."
       );
     } finally {
+      // Sembunyikan loading
       setIsVerifyingWhatsapp(false);
-      setVerificationInProgress(false);
     }
   };
 
@@ -173,7 +176,7 @@ export default function RegisterScreen() {
               onPress: () => {
                 navigation.navigate("Verification", {
                   email: formData.email,
-                  userData: response.data.user,
+                  userData: response.user,
                 });
               },
             },
@@ -358,30 +361,6 @@ export default function RegisterScreen() {
             )}
           </View>
 
-          {/* Address Field */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Alamat Domisili</Text>
-            <View
-              style={[styles.inputWrapper, errors.address && styles.inputError]}
-            >
-              <Ionicons
-                name="location-outline"
-                size={20}
-                color="#9CA3AF"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.textInput}
-                placeholder="Alamat lengkap Anda"
-                value={formData.address}
-                onChangeText={(text) => handleInputChange("address", text)}
-              />
-            </View>
-            {errors.address && (
-              <Text style={styles.errorText}>{errors.address}</Text>
-            )}
-          </View>
-
           {/* WhatsApp Field */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Nomor WhatsApp</Text>
@@ -389,7 +368,7 @@ export default function RegisterScreen() {
               style={[
                 styles.inputWrapper,
                 errors.whatsappNumber && styles.inputError,
-                whatsappVerified && styles.inputSuccess, // Tambahkan style ini
+                whatsappVerified && styles.inputSuccess,
               ]}
             >
               <Ionicons

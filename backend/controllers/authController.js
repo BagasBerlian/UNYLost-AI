@@ -4,6 +4,7 @@ const { validationResult } = require("express-validator");
 const db = require("../config/database");
 const crypto = require("crypto");
 const fontteService = require("../services/fontteService");
+const { sendVerificationEmail } = require("../services/emailService");
 
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -13,17 +14,12 @@ const generateToken = (userId) => {
 
 exports.register = async (req, res) => {
   try {
-    console.log("Register attempt received. Body:", req.body);
-    console.log(validationResult(req));
-
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { full_name, email, password, phone_number, address } = req.body;
-
-    console.log(full_name, email, password, phone_number, address);
 
     db.query(
       "SELECT * FROM users WHERE email = ?",
@@ -40,8 +36,13 @@ exports.register = async (req, res) => {
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
+        const verificationToken = Math.floor(
+          100000 + Math.random() * 900000
+        ).toString();
 
-        const verificationToken = crypto.randomBytes(32).toString("hex");
+        console.log(
+          `[DEV] Kode Verifikasi Email untuk ${email}: ${verificationToken}`
+        );
 
         const newUser = {
           full_name,
@@ -52,22 +53,43 @@ exports.register = async (req, res) => {
           verification_token: verificationToken,
         };
 
-        db.query("INSERT INTO users SET ?", newUser, (error, results) => {
+        db.query("INSERT INTO users SET ?", newUser, (error, insertResult) => {
           if (error) {
             console.error("Error registering user:", error);
             return res.status(500).json({ message: "Server error" });
           }
 
-          // Mengirimkan email verifikasi dengan verifikasi token
-          // return success
+          const newUserId = insertResult.insertId;
 
-          res.status(201).json({
-            message: "User registered successfully",
-            userId: results.insertId,
-            // Tidak mengirimkan token verification jika sudah di production, kirim pesan email
-            // Untuk pengembangan,sementara mengirim verifikasi token
-            verificationToken,
-          });
+          // Ambil data user yang baru dibuat untuk dikirim kembali ke frontend
+          db.query(
+            "SELECT id, full_name, email, phone_number, role FROM users WHERE id = ?",
+            [newUserId],
+            async (err, userRows) => {
+              if (err) {
+                console.error("Error fetching new user:", err);
+                return res.status(500).json({ message: "Server error" });
+              }
+
+              // Kirim email verifikasi
+              try {
+                await sendVerificationEmail(email, verificationToken);
+              } catch (emailError) {
+                console.error(
+                  "Gagal mengirim email verifikasi, tapi user tetap terdaftar:",
+                  emailError
+                );
+              }
+
+              // Kirim respons ke frontend dengan menyertakan objek user
+              res.status(201).json({
+                success: true,
+                message:
+                  "Registrasi berhasil. Silakan cek email Anda untuk kode verifikasi.",
+                user: userRows[0],
+              });
+            }
+          );
         });
       }
     );
@@ -84,58 +106,26 @@ exports.verifyWhatsapp = async (req, res) => {
     if (!phone) {
       return res.status(400).json({
         success: false,
-        message: "Nomor telepon harus diisi",
+        message: "Nomor telepon harus diisi.",
       });
     }
 
-    // Format nomor telepon untuk pengecekan
-    let formattedPhone = phone;
-
-    // Hapus karakter non-digit
-    formattedPhone = formattedPhone.replace(/\D/g, "");
-
-    // Verifikasi format
-    if (formattedPhone.length < 10 || formattedPhone.length > 15) {
-      return res.status(400).json({
-        success: false,
-        message: "Format nomor telepon tidak valid",
-      });
-    }
-
-    // Cek apakah nomor terdaftar di WhatsApp
-    const checkResult = await fontteService.checkWhatsappNumber(formattedPhone);
-
-    if (!checkResult.success) {
-      return res.status(400).json({
-        success: false,
-        message: checkResult.message,
-      });
-    }
-
-    if (!checkResult.isRegistered) {
-      return res.status(400).json({
-        success: false,
-        message: "Nomor ini tidak terdaftar di WhatsApp",
-      });
-    }
-
-    // Kirim kode verifikasi jika nomor terdaftar
-    const sendResult = await fontteService.sendVerificationCode(formattedPhone);
+    // Kirim kode verifikasi via Fonnte
+    const sendResult = await fontteService.sendVerificationCode(phone);
 
     if (!sendResult.success) {
-      return res.status(500).json({
+      // Jika Fonnte mengembalikan error, teruskan pesannya ke client
+      return res.status(400).json({
         success: false,
-        message: "Gagal mengirim kode verifikasi",
+        message: sendResult.message,
       });
     }
 
-    // PENTING: Pada produksi, simpan kode di database dan JANGAN kembalikan ke client
-    // Untuk keperluan development, kita kembalikan kode verifikasi
-    // Pada produksi, gunakan token untuk mengautentikasi
+    // PENTING: Pada produksi, JANGAN kembalikan kode ke client.
+    // Kode ini dikembalikan hanya untuk mempermudah development/testing.
     return res.status(200).json({
       success: true,
-      message: "Kode verifikasi telah dikirim ke WhatsApp Anda",
-      formattedNumber: checkResult.number,
+      message: "Kode verifikasi telah dikirim ke WhatsApp Anda.",
       code:
         process.env.NODE_ENV === "development" ? sendResult.code : undefined,
     });
@@ -143,7 +133,7 @@ exports.verifyWhatsapp = async (req, res) => {
     console.error("WhatsApp verification error:", error);
     return res.status(500).json({
       success: false,
-      message: "Terjadi kesalahan saat verifikasi WhatsApp",
+      message: "Terjadi kesalahan pada server saat verifikasi WhatsApp.",
     });
   }
 };
@@ -207,11 +197,17 @@ exports.login = (req, res) => {
 
 exports.verifyEmail = (req, res) => {
   try {
-    const { token } = req.params;
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res
+        .status(400)
+        .json({ message: "Email dan kode verifikasi harus diisi" });
+    }
 
     db.query(
-      "SELECT * FROM users WHERE verification_token = ?",
-      [token],
+      "SELECT * FROM users WHERE email = ? AND verification_token = ?",
+      [email, code],
       (error, results) => {
         if (error) {
           console.error("Database error:", error);
@@ -219,21 +215,25 @@ exports.verifyEmail = (req, res) => {
         }
 
         if (results.length === 0) {
-          return res
-            .status(400)
-            .json({ message: "Invalid verification token" });
+          return res.status(400).json({
+            message: "Kode verifikasi tidak valid atau sudah kedaluwarsa",
+          });
         }
+
+        const user = results[0];
 
         db.query(
           "UPDATE users SET is_verified = true, verification_token = NULL WHERE id = ?",
-          [results[0].id],
+          [user.id],
           (error) => {
             if (error) {
               console.error("Database error:", error);
               return res.status(500).json({ message: "Server error" });
             }
 
-            res.status(200).json({ message: "Email verified successfully" });
+            res
+              .status(200)
+              .json({ success: true, message: "Email berhasil diverifikasi" });
           }
         );
       }

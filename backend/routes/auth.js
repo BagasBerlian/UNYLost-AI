@@ -20,7 +20,8 @@ const registerValidation = [
 router.post("/register", registerValidation, authController.register);
 router.post("/verify-whatsapp", authController.verifyWhatsapp);
 router.post("/login", authController.login);
-router.get("/verify/:token", authController.verifyEmail);
+// router.get("/verify/:token", authController.verifyEmail);
+router.post("/verify-email", authController.verifyEmail);
 router.post("/forgot-password", authController.forgotPassword);
 router.post("/reset-password/:token", authController.resetPassword);
 

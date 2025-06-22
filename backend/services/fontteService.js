@@ -1,66 +1,86 @@
 const axios = require("axios");
 
+// Ambil API Key dari environment variable
 const FONNTE_API_KEY = process.env.FONNTE_API_KEY;
-const FONNTE_BASE_URL = "https://api.fonnte.com";
 
-const fontteService = {
-  /**
-   * Memeriksa apakah nomor terdaftar di WhatsApp (versi development)
-   * @param {string} phoneNumber - Nomor telepon
-   * @returns {Promise<Object>} - Status verifikasi
-   */
-  async checkWhatsappNumber(phoneNumber) {
-    // Format nomor telepon
-    let formattedNumber = phoneNumber;
+/**
+ * Mengirim pesan WhatsApp melalui API Fonnte.
+ * @param {string} phoneNumber - Nomor tujuan, akan diformat otomatis.
+ * @param {string} message - Pesan yang akan dikirim.
+ * @returns {Promise<Object>} - Status pengiriman.
+ */
+async function sendMessage(phoneNumber, message) {
+  if (!FONNTE_API_KEY) {
+    console.error("FONNTE_API_KEY tidak ditemukan di file .env");
+    return { success: false, message: "Konfigurasi server tidak lengkap." };
+  }
 
-    // Hapus karakter '+' jika ada
-    if (formattedNumber.startsWith("+")) {
-      formattedNumber = formattedNumber.substring(1);
-    }
+  // Format nomor: hapus non-digit, pastikan berawalan '62'
+  let target = phoneNumber.replace(/\D/g, "");
+  if (target.startsWith("0")) {
+    target = "62" + target.substring(1);
+  }
 
-    // Jika dimulai dengan '0', ganti dengan '62'
-    if (formattedNumber.startsWith("0")) {
-      formattedNumber = "62" + formattedNumber.substring(1);
-    }
-
-    // Jika belum memiliki kode negara, tambahkan '62'
-    if (!formattedNumber.startsWith("62") && !formattedNumber.startsWith("1")) {
-      formattedNumber = "62" + formattedNumber;
-    }
-
-    console.log("Formatted phone number:", formattedNumber);
-
-    // Untuk development, kita anggap semua nomor valid
-    return {
-      success: true,
-      isRegistered: true,
-      message: "Nomor terdaftar di WhatsApp",
-      number: formattedNumber,
-    };
-  },
-
-  /**
-   * Mengirim kode verifikasi via WhatsApp (versi development)
-   * @param {string} phoneNumber - Nomor telepon
-   * @returns {Promise<Object>} - Status pengiriman
-   */
-  async sendVerificationCode(phoneNumber) {
-    // Generate kode verifikasi (6 digit)
-    const verificationCode = Math.floor(
-      100000 + Math.random() * 900000
-    ).toString();
-
-    console.log(
-      `[DEV] Kode verifikasi untuk ${phoneNumber}: ${verificationCode}`
+  try {
+    const response = await axios.post(
+      "https://api.fonnte.com/send",
+      {
+        target: target,
+        message: message,
+      },
+      {
+        headers: {
+          Authorization: FONNTE_API_KEY,
+        },
+      }
     );
 
-    // Untuk development, kita anggap pesan berhasil dikirim
+    console.log("Respons dari Fonnte:", response.data);
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error(
+      "Error saat mengirim pesan via Fonnte:",
+      error.response ? error.response.data : error.message
+    );
+    const errorMessage =
+      error.response?.data?.reason || "Gagal mengirim pesan ke nomor WhatsApp.";
+    return { success: false, message: errorMessage };
+  }
+}
+
+/**
+ * Membuat dan mengirim kode verifikasi via WhatsApp.
+ * @param {string} phoneNumber - Nomor tujuan.
+ * @returns {Promise<Object>} - Hasil pengiriman beserta kode jika berhasil.
+ */
+async function sendVerificationCode(phoneNumber) {
+  const verificationCode = Math.floor(
+    100000 + Math.random() * 900000
+  ).toString();
+
+  console.log(
+    `[DEV] Kode Verifikasi WhatsApp untuk ${phoneNumber}: ${verificationCode}`
+  );
+
+  const message = `Kode verifikasi untuk UNY Lost App Anda adalah: *${verificationCode}*. Jangan berikan kode ini kepada siapa pun.`;
+
+  const result = await sendMessage(phoneNumber, message);
+
+  if (result.success) {
     return {
       success: true,
-      message: "Kode verifikasi berhasil dikirim",
-      code: verificationCode, // Untuk keperluan development saja
+      message: "Kode verifikasi berhasil dikirim.",
+      code: verificationCode, // Kode dikembalikan untuk mempermudah testing di environment development
     };
-  },
-};
+  } else {
+    return {
+      success: false,
+      message: result.message,
+    };
+  }
+}
 
-module.exports = fontteService;
+module.exports = {
+  sendVerificationCode,
+  sendMessage,
+};
