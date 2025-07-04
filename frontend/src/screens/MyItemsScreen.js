@@ -1,4 +1,3 @@
-// File: frontend/src/screens/MyItemsScreen.js
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -13,16 +12,17 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { foundItemAPI, lostItemAPI } from "../services/api";
+import { foundItemAPI, lostItemAPI, claimsAPI } from "../services/api"; // Correct import
 import BottomNavigation from "../components/BottomNavigation";
 
 export default function MyItemsScreen() {
   const navigation = useNavigation();
 
-  const [activeTab, setActiveTab] = useState("lost");
-  const [lostItems, setLostItems] = useState([]);
+  // State untuk tab aktif (temuan, hilang, klaim)
+  const [activeTab, setActiveTab] = useState("temuan");
   const [foundItems, setFoundItems] = useState([]);
+  const [lostItems, setLostItems] = useState([]);
+  const [claimItems, setClaimItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -33,7 +33,11 @@ export default function MyItemsScreen() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      await Promise.all([fetchLostItems(), fetchFoundItems()]);
+      await Promise.all([
+        fetchFoundItems(),
+        fetchLostItems(),
+        fetchClaimItems(),
+      ]);
     } catch (error) {
       console.error("Error loading data:", error);
       Alert.alert("Error", "Gagal memuat data barang");
@@ -42,13 +46,27 @@ export default function MyItemsScreen() {
     }
   };
 
-  const fetchLostItems = async () => {
+  const fetchFoundItems = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
-      const response = await lostItemAPI.getMyLostItems(token);
+      const response = await foundItemAPI.getMyItems(); // Correct usage
 
       if (response.success) {
-        setLostItems(response.data);
+        setFoundItems(response.data.items || response.data);
+      } else {
+        console.error("Failed to fetch found items:", response.message);
+      }
+    } catch (error) {
+      console.error("Error fetching found items:", error);
+      throw error;
+    }
+  };
+
+  const fetchLostItems = async () => {
+    try {
+      const response = await lostItemAPI.getMyItems(); // Correct usage
+
+      if (response.success) {
+        setLostItems(response.data.items || response.data);
       } else {
         console.error("Failed to fetch lost items:", response.message);
       }
@@ -58,18 +76,17 @@ export default function MyItemsScreen() {
     }
   };
 
-  const fetchFoundItems = async () => {
+  const fetchClaimItems = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
-      const response = await foundItemAPI.getMyFoundItems(token);
+      const response = await claimsAPI.getMyClaims();
 
       if (response.success) {
-        setFoundItems(response.data);
+        setClaimItems(response.data.claims || response.data);
       } else {
-        console.error("Failed to fetch found items:", response.message);
+        console.error("Failed to fetch claim items:", response.message);
       }
     } catch (error) {
-      console.error("Error fetching found items:", error);
+      console.error("Error fetching claim items:", error);
       throw error;
     }
   };
@@ -86,81 +103,42 @@ export default function MyItemsScreen() {
   };
 
   const handleItemPress = (item, type) => {
-    // Navigate to detail screen (akan diimplementasikan nanti)
-    console.log(`View ${type} item:`, item.id);
-    Alert.alert("Info", "Fitur detail barang akan segera tersedia");
+    if (type === "temuan") {
+      navigation.navigate("FoundItemDetail", { itemId: item.id });
+    } else if (type === "hilang") {
+      navigation.navigate("LostItemDetail", { itemId: item.id });
+    } else if (type === "klaim") {
+      navigation.navigate("ClaimDetail", { claimId: item.id });
+    }
   };
 
-  const handleDeleteItem = async (item, type) => {
-    Alert.alert(
-      "Konfirmasi Hapus",
-      `Apakah Anda yakin ingin menghapus ${
-        type === "lost" ? "barang hilang" : "barang temuan"
-      } ini?`,
-      [
-        { text: "Batal", style: "cancel" },
-        {
-          text: "Hapus",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setIsLoading(true);
-              const token = await AsyncStorage.getItem("userToken");
+  const formatTimeAgo = (dateString) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+    const diffMinutes = Math.floor(diffTime / (1000 * 60));
 
-              let response;
-              if (type === "lost") {
-                response = await lostItemAPI.deleteLostItem(item.id, token);
-              } else {
-                response = await foundItemAPI.deleteFoundItem(item.id, token);
-              }
-
-              if (response.success) {
-                if (type === "lost") {
-                  setLostItems(lostItems.filter((i) => i.id !== item.id));
-                } else {
-                  setFoundItems(foundItems.filter((i) => i.id !== item.id));
-                }
-                Alert.alert("Sukses", "Barang berhasil dihapus");
-              } else {
-                Alert.alert(
-                  "Error",
-                  response.message || "Gagal menghapus barang"
-                );
-              }
-            } catch (error) {
-              console.error("Error deleting item:", error);
-              Alert.alert("Error", "Terjadi kesalahan saat menghapus barang");
-            } finally {
-              setIsLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    if (diffDays > 0) {
+      return `${diffDays} hari yang lalu`;
+    } else if (diffHours > 0) {
+      return `${diffHours} jam yang lalu`;
+    } else if (diffMinutes > 0) {
+      return `${diffMinutes} menit yang lalu`;
+    } else {
+      return "Baru saja";
+    }
   };
 
-  const renderItem = ({ item, type }) => {
-    const isLost = type === "lost";
-    const statusColor = isLost
-      ? item.status === "found"
-        ? "#10B981"
-        : "#EF4444"
-      : item.status === "claimed"
-      ? "#10B981"
-      : "#3B82F6";
-
-    const statusText = isLost
-      ? item.status === "found"
-        ? "Ditemukan"
-        : "Hilang"
-      : item.status === "claimed"
-      ? "Diklaim"
-      : "Menunggu";
+  const renderTemuanItem = ({ item }) => {
+    const timeAgo = formatTimeAgo(item.created_at || item.createdAt);
+    const matchCount = item.matches_count || 0;
 
     return (
       <TouchableOpacity
         style={styles.itemCard}
-        onPress={() => handleItemPress(item, type)}
+        onPress={() => handleItemPress(item, "temuan")}
       >
         <View style={styles.itemContent}>
           <View style={styles.imageContainer}>
@@ -171,88 +149,228 @@ export default function MyItemsScreen() {
                 resizeMode="cover"
               />
             ) : (
-              <View
-                style={[
-                  styles.placeholderImage,
-                  { backgroundColor: isLost ? "#FECACA" : "#BFDBFE" },
-                ]}
-              >
-                <Ionicons
-                  name={isLost ? "search" : "basket"}
-                  size={30}
-                  color={isLost ? "#EF4444" : "#3B82F6"}
-                />
+              <View style={styles.placeholderImage}>
+                <Text>Foto {item.item_name || "Barang"}</Text>
               </View>
             )}
           </View>
           <View style={styles.itemDetails}>
-            <Text style={styles.itemName} numberOfLines={1}>
-              {item.item_name}
+            <Text style={styles.itemName}>
+              {item.item_name || "Barang Temuan"}
             </Text>
-            <Text style={styles.itemCategory} numberOfLines={1}>
-              {item.category_name}
-            </Text>
-            <Text style={styles.itemLocation} numberOfLines={1}>
-              {isLost ? item.last_seen_location : item.location}
-            </Text>
+            <View style={styles.matchContainer}>
+              <Ionicons name="people-outline" size={16} color="#3B82F6" />
+              <Text style={styles.matchText}>{matchCount} Matches</Text>
+            </View>
             <View style={styles.itemFooter}>
-              <Text style={styles.itemDate}>
-                {new Date(
-                  isLost ? item.lost_date : item.found_date
-                ).toLocaleDateString("id-ID")}
-              </Text>
-              <View
-                style={[styles.statusBadge, { backgroundColor: statusColor }]}
-              >
-                <Text style={styles.statusText}>{statusText}</Text>
-              </View>
+              <Text style={styles.itemDate}>{timeAgo}</Text>
             </View>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteItem(item, type)}
-        >
-          <Ionicons name="trash-outline" size={20} color="#EF4444" />
+        <TouchableOpacity style={styles.viewButton}>
+          <Text style={styles.viewButtonText}>Lihat matches</Text>
+          <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
         </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
-  const EmptyListComponent = ({ type }) => (
-    <View style={styles.emptyContainer}>
-      <Ionicons
-        name={type === "lost" ? "search" : "basket"}
-        size={64}
-        color={type === "lost" ? "#EF4444" : "#3B82F6"}
-        style={{ opacity: 0.5 }}
-      />
-      <Text style={styles.emptyTitle}>
-        Belum ada {type === "lost" ? "barang hilang" : "barang temuan"}
-      </Text>
-      <Text style={styles.emptyText}>
-        {type === "lost"
-          ? "Anda belum melaporkan barang hilang"
-          : "Anda belum melaporkan barang temuan"}
-      </Text>
+  const renderHilangItem = ({ item }) => {
+    const timeAgo = formatTimeAgo(item.created_at || item.createdAt);
+    const matchCount = item.matches_count || 0;
+
+    return (
       <TouchableOpacity
-        style={[
-          styles.reportButton,
-          {
-            backgroundColor: type === "lost" ? "#EF4444" : "#3B82F6",
-          },
-        ]}
-        onPress={() =>
-          navigation.navigate(type === "lost" ? "ReportLost" : "ReportFound")
-        }
+        style={styles.itemCard}
+        onPress={() => handleItemPress(item, "hilang")}
       >
-        <Ionicons name="add" size={20} color="white" />
-        <Text style={styles.reportButtonText}>
-          Laporkan {type === "lost" ? "Barang Hilang" : "Barang Temuan"}
-        </Text>
+        <View style={styles.itemContent}>
+          <View style={styles.imageContainer}>
+            {item.image_url ? (
+              <Image
+                source={{ uri: item.image_url }}
+                style={styles.itemImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.placeholderImage}>
+                <Text>Foto {item.item_name || "Barang"}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.itemDetails}>
+            <Text style={styles.itemName}>
+              {item.item_name || "Barang Hilang"}
+            </Text>
+            {item.status === "active" ? (
+              <View style={styles.statusContainer}>
+                <Ionicons name="time-outline" size={16} color="#F59E0B" />
+                <Text style={[styles.statusText, { color: "#F59E0B" }]}>
+                  Belum ada klaim
+                </Text>
+              </View>
+            ) : item.status === "found" ? (
+              <View style={styles.statusContainer}>
+                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                <Text style={[styles.statusText, { color: "#10B981" }]}>
+                  1 Klaim
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.statusContainer}>
+                <Ionicons name="close-circle" size={16} color="#EF4444" />
+                <Text style={[styles.statusText, { color: "#EF4444" }]}>
+                  Ditolak
+                </Text>
+              </View>
+            )}
+            <View style={styles.itemFooter}>
+              <Text style={styles.itemDate}>{timeAgo}</Text>
+            </View>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.viewButton}>
+          <Text style={styles.viewButtonText}>Review Klaim</Text>
+          <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
+        </TouchableOpacity>
       </TouchableOpacity>
-    </View>
-  );
+    );
+  };
+
+  const renderKlaimItem = ({ item }) => {
+    const timeAgo = formatTimeAgo(item.created_at || item.createdAt);
+    let statusIcon, statusColor, statusText;
+
+    if (item.status === "pending") {
+      statusIcon = "time-outline";
+      statusColor = "#F59E0B";
+      statusText = "Pending";
+    } else if (item.status === "approved") {
+      statusIcon = "checkmark-circle";
+      statusColor = "#10B981";
+      statusText = "Approved";
+    } else {
+      statusIcon = "close-circle";
+      statusColor = "#EF4444";
+      statusText = "Rejected";
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.itemCard}
+        onPress={() => handleItemPress(item, "klaim")}
+      >
+        <View style={styles.itemContent}>
+          <View style={styles.imageContainer}>
+            {item.image_url ? (
+              <Image
+                source={{ uri: item.image_url }}
+                style={styles.itemImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.placeholderImage}>
+                <Text>Foto {item.item_name || "Barang"}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.itemDetails}>
+            <Text style={styles.itemName}>
+              {item.item_name || "Laptop Asus"}
+            </Text>
+            <View style={styles.statusContainer}>
+              <Ionicons name={statusIcon} size={16} color={statusColor} />
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {statusText}
+              </Text>
+            </View>
+            <View style={styles.itemFooter}>
+              <Text style={styles.itemDate}>{timeAgo}</Text>
+            </View>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.viewButton}>
+          <Text style={styles.viewButtonText}>Review Barang</Text>
+          <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
+
+  // Komponen untuk daftar kosong
+  const EmptyListComponent = ({ type }) => {
+    let message, buttonText, iconName;
+
+    if (type === "temuan") {
+      message = "Anda belum pernah melaporkan barang temuan";
+      buttonText = "Laporkan Barang Temuan";
+      iconName = "add-circle";
+    } else if (type === "hilang") {
+      message = "Anda belum pernah melaporkan barang hilang";
+      buttonText = "Laporkan Barang Hilang";
+      iconName = "search";
+    } else {
+      message = "Anda belum pernah mengajukan klaim";
+      buttonText = "Cari Barang Hilang";
+      iconName = "search";
+    }
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="cube-outline" size={64} color="#d1d5db" />
+        <Text style={styles.emptyTitle}>Tidak ada data</Text>
+        <Text style={styles.emptyText}>{message}</Text>
+        <TouchableOpacity
+          style={[styles.reportButton, { backgroundColor: "#3B82F6" }]}
+          onPress={() => {
+            if (type === "temuan") {
+              navigation.navigate("ReportFound");
+            } else if (type === "hilang") {
+              navigation.navigate("ReportLost");
+            } else {
+              navigation.navigate("Dashboard");
+            }
+          }}
+        >
+          <Ionicons name={iconName} size={20} color="white" />
+          <Text style={styles.reportButtonText}>{buttonText}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Fungsi untuk merender item berdasarkan tab aktif
+  const renderItem = ({ item }) => {
+    if (activeTab === "temuan") {
+      return renderTemuanItem({ item });
+    } else if (activeTab === "hilang") {
+      return renderHilangItem({ item });
+    } else {
+      return renderKlaimItem({ item });
+    }
+  };
+
+  // Data yang ditampilkan berdasarkan tab aktif
+  const getActiveData = () => {
+    if (activeTab === "temuan") {
+      return foundItems;
+    } else if (activeTab === "hilang") {
+      return lostItems;
+    } else {
+      return claimItems;
+    }
+  };
+
+  // Mendapatkan jumlah item untuk badge di tab
+  const getCountBadge = (tab) => {
+    if (tab === "temuan") {
+      return foundItems.length;
+    } else if (tab === "hilang") {
+      return lostItems.length;
+    } else {
+      return claimItems.length;
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -264,7 +382,7 @@ export default function MyItemsScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Barang Saya</Text>
+        <Text style={styles.headerTitle}>Item Saya</Text>
       </View>
 
       {/* Tabs */}
@@ -272,34 +390,65 @@ export default function MyItemsScreen() {
         <TouchableOpacity
           style={[
             styles.tabButton,
-            activeTab === "lost" && styles.activeTabButton,
+            activeTab === "temuan" && styles.activeTabButton,
           ]}
-          onPress={() => setActiveTab("lost")}
+          onPress={() => setActiveTab("temuan")}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "lost" && styles.activeTabText,
-            ]}
-          >
-            Barang Hilang
-          </Text>
+          <View style={styles.tabLabelContainer}>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "temuan" && styles.activeTabText,
+              ]}
+            >
+              Temuan
+            </Text>
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>{getCountBadge("temuan")}</Text>
+            </View>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.tabButton,
-            activeTab === "found" && styles.activeTabButton,
+            activeTab === "hilang" && styles.activeTabButton,
           ]}
-          onPress={() => setActiveTab("found")}
+          onPress={() => setActiveTab("hilang")}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "found" && styles.activeTabText,
-            ]}
-          >
-            Barang Temuan
-          </Text>
+          <View style={styles.tabLabelContainer}>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "hilang" && styles.activeTabText,
+              ]}
+            >
+              Hilang
+            </Text>
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>{getCountBadge("hilang")}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "klaim" && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab("klaim")}
+        >
+          <View style={styles.tabLabelContainer}>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "klaim" && styles.activeTabText,
+              ]}
+            >
+              Klaim Saya
+            </Text>
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>{getCountBadge("klaim")}</Text>
+            </View>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -311,9 +460,9 @@ export default function MyItemsScreen() {
         </View>
       ) : (
         <FlatList
-          data={activeTab === "lost" ? lostItems : foundItems}
+          data={getActiveData()}
           keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => renderItem({ item, type: activeTab })}
+          renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -374,6 +523,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderBottomColor: "#3B82F6",
   },
+  tabLabelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   tabText: {
     fontSize: 16,
     fontWeight: "bold",
@@ -381,6 +534,18 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: "#3B82F6",
+  },
+  badgeContainer: {
+    backgroundColor: "#EF4444",
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
   },
   loadingContainer: {
     flex: 1,
@@ -401,8 +566,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
     padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -410,15 +573,16 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   itemContent: {
-    flex: 1,
     flexDirection: "row",
+    marginBottom: 12,
   },
   imageContainer: {
-    width: 80,
-    height: 80,
+    width: 60,
+    height: 60,
     borderRadius: 8,
     overflow: "hidden",
     marginRight: 12,
+    backgroundColor: "#F3F4F6",
   },
   itemImage: {
     width: "100%",
@@ -429,10 +593,11 @@ const styles = StyleSheet.create({
     height: "100%",
     justifyContent: "center",
     alignItems: "center",
+    padding: 4,
   },
   itemDetails: {
     flex: 1,
-    justifyContent: "space-between",
+    justifyContent: "center",
   },
   itemName: {
     fontSize: 16,
@@ -440,15 +605,24 @@ const styles = StyleSheet.create({
     color: "#374151",
     marginBottom: 4,
   },
-  itemCategory: {
-    fontSize: 14,
-    color: "#6B7280",
+  matchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 4,
   },
-  itemLocation: {
+  matchText: {
     fontSize: 14,
-    color: "#6B7280",
-    marginBottom: 8,
+    color: "#3B82F6",
+    marginLeft: 4,
+  },
+  statusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  statusText: {
+    fontSize: 14,
+    marginLeft: 4,
   },
   itemFooter: {
     flexDirection: "row",
@@ -459,18 +633,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9CA3AF",
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  viewButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "white",
-  },
-  deleteButton: {
-    padding: 8,
+  viewButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#3B82F6",
+    marginRight: 4,
   },
   emptyContainer: {
     alignItems: "center",

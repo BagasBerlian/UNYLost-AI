@@ -21,7 +21,7 @@ import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_URL = "http://192.168.167.105:5000/api";
+const API_URL = "http://192.168.134.105:5000/api";
 
 export default function ReportFoundScreen() {
   const navigation = useNavigation();
@@ -271,6 +271,13 @@ export default function ReportFoundScreen() {
 
     setLoading(true);
 
+    const formatDateForMySQL = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
     try {
       // Create FormData object to send multipart/form-data
       const formDataObj = new FormData();
@@ -280,19 +287,14 @@ export default function ReportFoundScreen() {
       formDataObj.append("description", formData.description);
       formDataObj.append("location", formData.location);
       formDataObj.append("category_id", formData.category_id);
-      formDataObj.append("found_date", formData.found_date.toISOString());
+      formDataObj.append("found_date", formatDateForMySQL(formData.found_date));
 
       // Add images to FormData
       images.forEach((image, index) => {
-        const uriParts = image.uri.split("/");
-        const fileName = uriParts[uriParts.length - 1];
+        const fileName = `image_${index}.jpg`;
 
-        // Format yang berbeda - tanpa array notation
-        formDataObj.append("images", {
-          uri: image.uri,
-          name: fileName,
-          type: "image/jpeg",
-        });
+        // Use simple string append, not object
+        formDataObj.append("images", image.uri, fileName);
       });
 
       // Log what we're sending for debugging

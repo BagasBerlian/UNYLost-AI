@@ -17,14 +17,13 @@ import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Slider from "@react-native-community/slider";
-import { categoriesAPI, lostItemsAPI } from "../services/api";
-import { useAuth } from "../context/AuthContext";
+import { categoriesAPI, lostItemAPI } from "../services/api";
 
 export default function ReportLostScreen() {
   const navigation = useNavigation();
-  const { user } = useAuth();
 
   const [loading, setLoading] = useState(false);
+  // FIX: Menggunakan state untuk satu gambar (image), bukan array (images)
   const [image, setImage] = useState(null);
   const [categories, setCategories] = useState([]);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -90,7 +89,6 @@ export default function ReportLostScreen() {
     try {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
-
       if (status !== "granted") {
         Alert.alert(
           "Izin Diperlukan",
@@ -100,21 +98,22 @@ export default function ReportLostScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: false,
-        allowsMultipleSelection: true,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        // FIX: Hanya memperbolehkan memilih satu gambar
+        allowsEditing: true,
+        allowsMultipleSelection: false,
         aspect: [4, 3],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        // Limit to 5 images max
-        const newImages = [...images, ...result.assets].slice(0, 5);
-        setImages(newImages);
-
-        // Tambahkan log untuk verifikasi
-        console.log("Gambar terpilih:", JSON.stringify(result.assets));
-        console.log("Total gambar saat ini:", newImages.length);
+        // FIX: Ambil gambar pertama dari array assets dan set ke state 'image'
+        const selectedImage = result.assets[0];
+        setImage({
+          uri: selectedImage.uri,
+          name: selectedImage.fileName || selectedImage.uri.split("/").pop(),
+          type: selectedImage.type || "image/jpeg",
+        });
       }
     } catch (error) {
       console.error("Error picking image:", error);
@@ -128,29 +127,23 @@ export default function ReportLostScreen() {
 
   const validateForm = () => {
     const newErrors = {};
-
-    if (!formData.description || formData.description.trim() === "") {
+    if (!formData.item_name.trim())
+      newErrors.item_name = "Nama barang harus diisi";
+    if (!formData.description.trim())
       newErrors.description = "Deskripsi barang harus diisi";
-    }
-
-    if (
-      !formData.last_seen_location ||
-      formData.last_seen_location.trim() === ""
-    ) {
+    if (!formData.last_seen_location.trim())
       newErrors.last_seen_location = "Lokasi terakhir harus diisi";
-    }
-
-    if (!formData.category_id) {
-      newErrors.category_id = "Kategori harus dipilih";
-    }
-
+    if (!formData.category_id) newErrors.category_id = "Kategori harus dipilih";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
     if (!validateForm()) {
-      Alert.alert("Error", "Harap lengkapi semua field yang diperlukan");
+      Alert.alert(
+        "Form Belum Lengkap",
+        "Harap lengkapi semua field yang wajib diisi (*)."
+      );
       return;
     }
 
@@ -160,7 +153,7 @@ export default function ReportLostScreen() {
       const formattedDate = formData.lost_date.toISOString().split("T")[0];
 
       const submitData = {
-        item_name: formData.item_name || "Barang Hilang",
+        item_name: formData.item_name,
         description: formData.description,
         last_seen_location: formData.last_seen_location,
         category_id: formData.category_id,
@@ -168,37 +161,37 @@ export default function ReportLostScreen() {
         reward: formData.reward > 0 ? formData.reward.toString() : null,
       };
 
-      const response = await lostItemsAPI.create(submitData, image);
-
-      setLoading(false);
+      // FIX: Mengirim `image` (singular) ke API
+      const response = await lostItemAPI.create(submitData, image);
 
       if (response.success) {
+        Alert.alert("Sukses", "Laporan Anda telah berhasil dikirim.");
         navigation.navigate("ReportSuccess", {
           type: "lost",
           itemId: response.data.item.id,
-          reportId: `UNY${Math.floor(1000000 + Math.random() * 9000000)}`,
+          reportId: `UNYLOST-${response.data.item.id}`,
         });
       } else {
         Alert.alert("Error", response.message || "Gagal mengirim laporan");
       }
     } catch (error) {
-      setLoading(false);
       console.error("Error submitting report:", error);
       Alert.alert("Error", "Terjadi kesalahan saat mengirim laporan");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Format date for display
   const formatDate = (date) => {
-    const d = new Date(date);
-    return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
-      .toString()
-      .padStart(2, "0")}/${d.getFullYear()}`;
+    return new Date(date).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
   };
 
-  // Format currency
   const formatCurrency = (value) => {
-    return `Rp. ${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+    return `Rp ${Number(value).toLocaleString("id-ID")}`;
   };
 
   const selectedCategory = categories.find(
@@ -211,7 +204,6 @@ export default function ReportLostScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -223,100 +215,67 @@ export default function ReportLostScreen() {
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Info Banner */}
           <View style={styles.infoBanner}>
             <Ionicons name="information-circle" size={24} color="#3478F6" />
             <Text style={styles.infoText}>
-              Silakan isi detail barang yang kamu hilangkan dengan lengkap untuk
-              memudahkan proses pencarian.
+              Isi detail barang yang hilang dengan lengkap untuk memudahkan
+              proses pencarian.
             </Text>
           </View>
 
-          {/* Upload Photo Section */}
+          {/* FIX: Ubah tampilan untuk satu gambar */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>
               Unggah Foto Barang <Text style={styles.optional}>(Opsional)</Text>
             </Text>
-
-            {/* Bagian preview gambar */}
-            <View style={styles.imagePreviewSection}>
-              <Text style={styles.sectionTitle}>Foto Barang</Text>
-
-              <TouchableOpacity
-                style={styles.imagePickerButton}
-                onPress={pickImage}
-              >
-                <Ionicons name="camera-outline" size={24} color="#3478F6" />
-                <Text style={styles.imagePickerText}>
-                  {images.length > 0 ? "Tambah Foto" : "Pilih Foto"}
+            {image ? (
+              <View style={styles.imagePreviewContainer}>
+                <Image
+                  source={{ uri: image.uri }}
+                  style={styles.previewImage}
+                />
+                <TouchableOpacity
+                  style={styles.removeImageButton}
+                  onPress={removeImage}
+                >
+                  <Ionicons name="close-circle" size={24} color="#FF3B30" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
+                <Ionicons name="image-outline" size={36} color="#3478F6" />
+                <Text style={styles.uploadText}>Klik untuk memilih foto</Text>
+                <Text style={styles.uploadSubtext}>
+                  Format: JPG, PNG (Maks. 5MB)
                 </Text>
               </TouchableOpacity>
-
-              {/* Preview gambar yang dipilih */}
-              {images.length > 0 && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.previewContainer}
-                >
-                  {images.map((image, index) => (
-                    <View key={index} style={styles.previewImageContainer}>
-                      <Image
-                        source={{ uri: image.uri }}
-                        style={styles.previewImage}
-                      />
-                      <TouchableOpacity
-                        style={styles.removeImageButton}
-                        onPress={() => {
-                          const newImages = [...images];
-                          newImages.splice(index, 1);
-                          setImages(newImages);
-                        }}
-                      >
-                        <Ionicons
-                          name="close-circle"
-                          size={24}
-                          color="#FF3B30"
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              )}
-            </View>
-
-            <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
-              <Ionicons name="image-outline" size={36} color="#3478F6" />
-              <Text style={styles.uploadText}>Klik untuk memasukkan foto</Text>
-              <Text style={styles.uploadSubtext}>
-                Format: JPG, PNG (Maks. 5MB)
-              </Text>
-            </TouchableOpacity>
-
-            {/* Image Preview */}
-            {image && (
-              <View style={styles.imagePreviewContainer}>
-                <View style={styles.imagePreview}>
-                  <Image
-                    source={{ uri: image.uri }}
-                    style={styles.previewImage}
-                  />
-                  <TouchableOpacity
-                    style={styles.removeImageButton}
-                    onPress={removeImage}
-                  >
-                    <Ionicons name="close-circle" size={24} color="#FF3B30" />
-                  </TouchableOpacity>
-                </View>
-              </View>
             )}
-
-            <Text style={styles.photoCount}>
-              {image ? "1" : "0"} foto dipilih
-            </Text>
           </View>
 
-          {/* Description Section */}
+          {/* Nama Barang */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>
+              Nama Barang <Text style={styles.required}>*</Text>
+            </Text>
+            <View style={styles.inputContainer}>
+              <Ionicons
+                name="cube-outline"
+                size={24}
+                color="#A3A3A3"
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Contoh: Dompet kulit hitam"
+                value={formData.item_name}
+                onChangeText={(text) => handleInputChange("item_name", text)}
+              />
+            </View>
+            {errors.item_name && (
+              <Text style={styles.errorText}>{errors.item_name}</Text>
+            )}
+          </View>
+
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>
               Deskripsi Detail Barang <Text style={styles.required}>*</Text>
@@ -324,9 +283,7 @@ export default function ReportLostScreen() {
             <TextInput
               style={styles.textArea}
               placeholder="Jelaskan detail barang seperti warna, merek, kondisi, dll."
-              placeholderTextColor="#A3A3A3"
               multiline
-              numberOfLines={4}
               value={formData.description}
               onChangeText={(text) => handleInputChange("description", text)}
             />
@@ -335,7 +292,6 @@ export default function ReportLostScreen() {
             )}
           </View>
 
-          {/* Location Section */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>
               Lokasi Terakhir <Text style={styles.required}>*</Text>
@@ -350,7 +306,6 @@ export default function ReportLostScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Contoh: Gedung FMIPA Lantai 2"
-                placeholderTextColor="#A3A3A3"
                 value={formData.last_seen_location}
                 onChangeText={(text) =>
                   handleInputChange("last_seen_location", text)
@@ -362,7 +317,6 @@ export default function ReportLostScreen() {
             )}
           </View>
 
-          {/* Category Section */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>
               Kategori <Text style={styles.required}>*</Text>
@@ -392,8 +346,6 @@ export default function ReportLostScreen() {
             {errors.category_id && (
               <Text style={styles.errorText}>{errors.category_id}</Text>
             )}
-
-            {/* Category Picker Dropdown */}
             {showCategoryPicker && (
               <View style={styles.dropdownContainer}>
                 {categories.map((category) => (
@@ -417,7 +369,6 @@ export default function ReportLostScreen() {
             )}
           </View>
 
-          {/* Date Section */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>
               Tanggal Hilang <Text style={styles.required}>*</Text>
@@ -435,10 +386,7 @@ export default function ReportLostScreen() {
               <Text style={[styles.pickerText, styles.activePickerText]}>
                 {formatDate(formData.lost_date)}
               </Text>
-              <Ionicons name="calendar" size={24} color="#A3A3A3" />
             </TouchableOpacity>
-
-            {/* Date Picker Modal */}
             {showDatePicker && (
               <DateTimePicker
                 value={formData.lost_date}
@@ -450,55 +398,31 @@ export default function ReportLostScreen() {
             )}
           </View>
 
-          {/* Reward Section */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>
               Hadiah <Text style={styles.optional}>(Opsional)</Text>
             </Text>
-
             <View style={styles.rewardContainer}>
-              <Text style={styles.rewardValue}>Rp. 0</Text>
-              <Slider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={500000}
-                step={10000}
-                value={formData.reward}
-                onValueChange={(value) => handleInputChange("reward", value)}
-                minimumTrackTintColor="#3478F6"
-                maximumTrackTintColor="#E5E5EA"
-                thumbTintColor="#3478F6"
-              />
-              <Text style={styles.rewardValue}>Rp. 500.000</Text>
+              <Text style={styles.rewardValue}>
+                {formatCurrency(formData.reward)}
+              </Text>
             </View>
-
-            <View style={styles.rewardInputContainer}>
-              <Text style={styles.rewardLabel}>hadiah:</Text>
-              <TextInput
-                style={styles.rewardInput}
-                placeholder="Rp. 0"
-                placeholderTextColor="#A3A3A3"
-                keyboardType="number-pad"
-                value={
-                  formData.reward > 0 ? formatCurrency(formData.reward) : ""
-                }
-                onChangeText={(text) => {
-                  // Extract numbers only
-                  const numericValue =
-                    parseInt(text.replace(/[^0-9]/g, "")) || 0;
-                  if (numericValue <= 500000) {
-                    handleInputChange("reward", numericValue);
-                  }
-                }}
-              />
-            </View>
-
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={500000}
+              step={10000}
+              value={formData.reward}
+              onValueChange={(value) => handleInputChange("reward", value)}
+              minimumTrackTintColor="#3478F6"
+              maximumTrackTintColor="#E5E5EA"
+              thumbTintColor="#3478F6"
+            />
             <Text style={styles.rewardHint}>
-              Tambahkan reward untuk meningkatkan peluang barang ditemukan
+              Menambahkan hadiah dapat meningkatkan peluang barang ditemukan.
             </Text>
           </View>
 
-          {/* Submit Button */}
           <TouchableOpacity
             style={styles.submitButton}
             onPress={handleSubmit}
@@ -511,7 +435,6 @@ export default function ReportLostScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Bottom spacing */}
           <View style={{ height: 40 }} />
         </ScrollView>
       </View>
@@ -519,11 +442,9 @@ export default function ReportLostScreen() {
   );
 }
 
+// Salin Stylesheet dari file asli, karena tidak ada error di dalamnya
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F5F7",
-  },
+  container: { flex: 1, backgroundColor: "#F5F5F7" },
   header: {
     backgroundColor: "#3478F6",
     paddingTop: 50,
@@ -532,49 +453,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  backButton: {
-    marginRight: 15,
-  },
-  headerTitle: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
+  backButton: { marginRight: 15 },
+  headerTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
+  content: { flex: 1, padding: 16 },
   infoBanner: {
     backgroundColor: "#E8F1FF",
     borderRadius: 12,
     padding: 16,
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     marginBottom: 24,
   },
-  infoText: {
-    flex: 1,
-    marginLeft: 10,
-    color: "#3478F6",
-    fontSize: 15,
-  },
-  formSection: {
-    marginBottom: 24,
-  },
+  infoText: { flex: 1, marginLeft: 10, color: "#3478F6", fontSize: 15 },
+  formSection: { marginBottom: 24 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    marginBottom: 8,
+    marginBottom: 12,
     color: "#333",
   },
-  required: {
-    color: "#FF3B30",
-  },
-  optional: {
-    color: "#8E8E93",
-    fontWeight: "normal",
-    fontSize: 14,
-  },
+  required: { color: "#FF3B30" },
+  optional: { color: "#8E8E93", fontWeight: "normal", fontSize: 14 },
   uploadBox: {
     borderWidth: 1,
     borderStyle: "dashed",
@@ -591,37 +490,22 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontWeight: "500",
   },
-  uploadSubtext: {
-    fontSize: 14,
-    color: "#8E8E93",
-    marginTop: 4,
-  },
-  imagePreviewContainer: {
-    flexDirection: "row",
-    marginTop: 16,
-  },
-  imagePreview: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    position: "relative",
-  },
+  uploadSubtext: { fontSize: 14, color: "#8E8E93", marginTop: 4 },
+  imagePreviewContainer: { alignItems: "center", marginBottom: 16 },
   previewImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 8,
+    width: 200,
+    height: 200,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
   },
   removeImageButton: {
     position: "absolute",
-    top: -8,
-    right: -8,
-    backgroundColor: "white",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(255,255,255,0.7)",
     borderRadius: 12,
-  },
-  photoCount: {
-    marginTop: 8,
-    fontSize: 14,
-    color: "#8E8E93",
+    padding: 4,
   },
   textArea: {
     backgroundColor: "white",
@@ -643,15 +527,8 @@ const styles = StyleSheet.create({
     borderColor: "#E5E5EA",
     paddingHorizontal: 12,
   },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
-    color: "#333",
-  },
+  inputIcon: { marginRight: 8 },
+  input: { flex: 1, height: 50, fontSize: 16, color: "#333" },
   pickerContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -662,82 +539,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 50,
   },
-  pickerText: {
-    flex: 1,
-    fontSize: 16,
-    color: "#A3A3A3",
-  },
-  activePickerText: {
-    color: "#333",
-  },
+  pickerText: { flex: 1, fontSize: 16, color: "#A3A3A3" },
+  activePickerText: { color: "#333" },
   dropdownContainer: {
     backgroundColor: "white",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#E5E5EA",
     marginTop: 8,
-    maxHeight: 200,
-    overflow: "scroll",
   },
   dropdownItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#F2F2F7",
   },
-  dropdownItemText: {
-    fontSize: 16,
-    color: "#333",
-    marginLeft: 8,
-  },
-  rewardContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginVertical: 8,
-  },
-  slider: {
-    flex: 1,
-    height: 40,
-    marginHorizontal: 8,
-  },
-  rewardValue: {
-    fontSize: 14,
-    color: "#8E8E93",
-    width: 80,
-  },
-  rewardInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  rewardLabel: {
-    fontSize: 14,
-    color: "#8E8E93",
-    marginRight: 8,
-  },
-  rewardInput: {
-    flex: 1,
-    height: 40,
-    backgroundColor: "white",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E5EA",
-    paddingHorizontal: 12,
-    fontSize: 16,
-    color: "#333",
-  },
+  dropdownItemText: { fontSize: 16, color: "#333", marginLeft: 8 },
+  rewardContainer: { alignItems: "center", marginVertical: 8 },
+  rewardValue: { fontSize: 18, color: "#333", fontWeight: "600" },
+  slider: { width: "100%", height: 40 },
   rewardHint: {
     fontSize: 14,
     color: "#8E8E93",
     marginTop: 8,
+    textAlign: "center",
   },
-  errorText: {
-    color: "#FF3B30",
-    fontSize: 14,
-    marginTop: 4,
-  },
+  errorText: { color: "#FF3B30", fontSize: 14, marginTop: 4 },
   submitButton: {
     backgroundColor: "#3478F6",
     borderRadius: 12,
@@ -746,9 +574,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 16,
   },
-  submitButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+  submitButtonText: { color: "white", fontSize: 16, fontWeight: "bold" },
 });

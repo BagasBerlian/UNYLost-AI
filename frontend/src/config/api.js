@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 
 // GANTI IP INI DENGAN IP LAPTOP ANDA
-const LAPTOP_IP = "192.168.167.105"; // ← UBAH SESUAI IP LAPTOP
+const LAPTOP_IP = "192.168.134.105"; // ← UBAH SESUAI IP LAPTOP
 
 function getApiBaseUrl() {
   // Jika running di Expo Go (real device)
